@@ -55,7 +55,7 @@ def speak_c(text, style='', pitch=0, rate=0, volume=0, send=True, play=False, re
     ssml = ssml1 + ssml2 + ssml3 + ssml4 + ssml5
 
     speech_config = SpeechConfig(
-        subscription='bdb82bca1ed3420492e20e6010a17ab0',
+        subscription=sets.tts_token,
         region='canadacentral')
     if play:
         audio_config = audio.AudioOutputConfig(

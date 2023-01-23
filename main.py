@@ -110,10 +110,10 @@ async def get_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 if __name__ == '__main__':
-    TOKEN = '5882202891:AAFQZ-5YCZV7pJ6UyYXaSfx-yBggEU_pSw8'
-    application = ApplicationBuilder().token(TOKEN).build()
     section = 'DEFAULT'
     language = 'zh-CN'
+    sets.get_token()
+    application = ApplicationBuilder().token(sets.telegram_token).build()
 
     get_m = GetMessage
     send_m = SendMessage

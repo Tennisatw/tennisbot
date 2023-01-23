@@ -13,7 +13,7 @@ def chatgpt(question, lang='zh-CN'):
         else:
             prom = prom_add + data[0] + 'Q: ' + question + '|\nA: '
         file.close()
-        key = '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'
+        key = sets.chatGPT_token
         openai.api_key = key
         response = openai.Completion.create(
             model="text-davinci-003",

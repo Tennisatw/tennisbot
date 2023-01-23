@@ -28,6 +28,16 @@ class Setting:
         cls.sending = bool(config[section]['sending'])
 
     @classmethod
+    def get_token(cls):
+        bot_config = 'bot_config.ini'
+        config = ConfigParser()
+        config.read(bot_config, encoding='utf-8')
+        section = 'TOKENS'
+        cls.telegram_token = config[section]['telegram']
+        cls.chatGPT_token = config[section]['chatGPT']
+        cls.tts_token = config[section]['tts']
+
+    @classmethod
     def save(cls, section):
         bot_config = 'bot_config.ini'
         config = ConfigParser()
@@ -48,6 +58,9 @@ class Setting:
     chat_model = 1
     developer_mode = False
     sending = True
+    telegram_token = ''
+    chatGPT_token = ''
+    tts_token = ''
 
 
 class GetMessage:
