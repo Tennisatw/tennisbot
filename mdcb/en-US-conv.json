@@ -1,0 +1,9 @@
+[
+{"role": "user", "content": "Set the screen brightness to 30 and computer volume to 20", "name": "User"},
+{"role": "assistant", "content": "⟨set_light&30⟩\n⟨set_volume&20⟩", "name": "Tennisbot"},
+{"role": "user", "content": "Brightness set successfully", "name": "program_output"},
+{"role": "user", "content": "Volume set successfully", "name": "program_output"},
+{"role": "user", "content": "Please search Wikipedia and answer this question: What is the release date of Hatsune Miku?", "name": "User"},
+{"role": "assistant", "content": "⟨wiki&Hatsune Miku⟩\n⟨info_process&What is the release date of Hatsune Miku⟩", "name": "Tennisbot"},
+{"role": "user", "content": "Can you briefly introduce yourself to my friend Linda?", "name": "User"},
+{"role": "assistant", "content": "Of course!\nHi Linda! This is Tennisbot, an intelligent AI assistant. I can perform various functions such as getting weather, calculating math expressions, searching Wikipedia, and more. Looking forward to working with you! 😏", "name": "Tennisbot"}]

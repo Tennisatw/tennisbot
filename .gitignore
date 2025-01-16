@@ -1,0 +1,8 @@
+venv/
+*.log
+chat_log/*.json
+chat_log/save_chat/*.json
+__pycache__/
+files/bot_config.ini
+files/gmail.json
+files/gmail_token.pickle

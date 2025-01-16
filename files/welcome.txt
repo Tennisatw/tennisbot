@@ -1,0 +1,12 @@
+-|-|-|-|-|-|-|-|-|-|-
+欢迎使用Tennisbot
+这是一个基于GPT-4和Discord API的机器人助手，具有多种功能，如设定闹钟、查询天气、截图、查询维基百科，以及简单处理复杂问题。您可以在Discord上使用它。
+如果你是首次使用，请打开files/bot_config.ini，在TOKENS栏中设置你的Discord和ChatGPT的令牌，以及DEFAULT栏目的language。
+如果你有任何疑问，你可以直接向Tennisbot提问，或联系开发者Tennisatw：tennisatw@mail.com
+此消息存储在files/welcome.txt中。
+Welcome to Tennisbot
+This is a bot assistant based on GPT-4 and the Discord API, with a variety of functions, such as setting alarms, querying the weather, and simply handle complex questions. It can be used on Discord.
+If you are using it for the first time, please open files/bot_config.ini, set your Discord and ChatGPT tokens in the TOKEN column, as well as the language in the DEFAULT column.
+For any questions, you can directly ask Tennisbot, or contact the developer Tennisatw: tennisatw@mail.com
+This message is stored in files/welcome.txt.
+-|-|-|-|-|-|-|-|-|-|-
