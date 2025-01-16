@@ -6,3 +6,4 @@ __pycache__/
 files/bot_config.ini
 files/gmail.json
 files/gmail_token.pickle
+update_hint.txt

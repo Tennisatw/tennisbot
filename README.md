@@ -5,6 +5,10 @@
 A powerful intelligent Discord AI assistant and chatbot developed with Python, discord.py, and OpenAI API, supporting both English and Chinese.
 Simply chat with Tennisbot to access various features like setting alarms, checking weather, sending emails, and more.
 
+## Try Tennisbot
+
+Welcome to join our [Discord channel](https://discord.gg/trCwuPYvG2) and start chatting with Tennisbot right away, while it's still not crowded.
+
 ## Features
 
 - 💬 Intelligent Conversation: Integrated with large language model API, with configurable personality (in mdcb/en-US-system.txt)

@@ -5,6 +5,10 @@
 一个功能强大的智能Discord AI助手和聊天机器人，基于Python、discord.py和OpenAI API开发，支持中英文。
 仅需通过与Tennisbot对话，即可使用各种功能，如设置闹钟，查询天气，收发邮件等等
 
+## 体验Tennisbot
+
+欢迎加入我们的[Discord频道](https://discord.gg/trCwuPYvG2)，立即尝试与Tennisbot聊天吧，趁现在还没什么人。
+
 ## 功能特性
 
 - 💬 智能对话：接入大语言模型API，且支持配置个性化人格（在mdcb/zh-CN-system.txt中）
