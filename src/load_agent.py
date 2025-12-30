@@ -30,16 +30,16 @@ def load_agent_tools(tool_names):
     return tools
 
 def load_main_agent():
-    # Load main agent from agents/main_agent.md
+    # Load main agent from agents/agent.md
 
-    with open("agents/main_agent.json", "r", encoding="utf-8") as f:
+    with open("agents/agent.json", "r", encoding="utf-8") as f:
         agent_config = json.load(f)
         model = agent_config.get("model", "gpt-5-mini")
         tools = load_agent_tools(agent_config.get("tools", []))
         temperature = agent_config.get("temperature", 1.0)
 
     ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open("agents/main_agent.md", "r", encoding="utf-8") as f:
+    with open("agents/agent.md", "r", encoding="utf-8") as f:
         instructions = f.read().replace("ROOT_PATH", ROOT_PATH)
 
     agent = Agent(

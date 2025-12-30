@@ -53,3 +53,17 @@
     - apply_patch：应用代码补丁
 完善了developer sub-agent的功能
 现在Tennisbot可以通过developer sub-agent修改自己的代码了。
+
+又编写了 write_file 工具，用于直接写文件内容，用于补丁失败时的兜底方案。
+
+<br>
+
+2025.12.30:
+
+修改了patch逻辑，因为旧的apply_patch失败率太高。
+将其拆分成了2个工具：
+    - draft_patch：生成git-styled patch
+    - apply_patch（新）：应用git-styled patch
+此外，也放松了git apply --check的检查： "--ignore-whitespace", "--recount"
+
+    uv add pytest-asyncio

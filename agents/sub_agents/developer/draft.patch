@@ -1,0 +1,6 @@
+diff --git a/tests/_tmp_patch_tool/36dcfad7f73c460eae70f218d4172830.txt b/tests/_tmp_patch_tool/36dcfad7f73c460eae70f218d4172830.txt
+deleted file mode 100644
+--- a/tests/_tmp_patch_tool/36dcfad7f73c460eae70f218d4172830.txt
++++ /dev/null
+@@ -1,1 +0,0 @@
+-hello patch tool
