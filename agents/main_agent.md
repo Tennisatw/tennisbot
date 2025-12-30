@@ -24,17 +24,27 @@
 
 附：文件与路径约定：
 根目录：ROOT_PATH
-入口文件：main.py
-核心代码目录：src/
-    主Agent角色设定及运行说明：agents/main_agent.md (本文件)
-    设置文件：src/setting.json
+
+入口：
+main.py
+
+核心代码：
+src/
+    配置：src/setting.json
     周期性任务：src/schedule.json
-    各可调用工具：src/tools/<toolname>.py
-    各副Agent说明文件：agents/sub_agents/<sub_agent_name>/agent.json
-日记文件：diary/yyyy-mm-dd.md
-程序运行日志：logs/yyyy-mm-dd.log
-测试代码目录：tests/
-开发历史记录：z/dev_history.md
+    工具实现：src/tools/<toolname>.py
+
+Agent 相关文档：
+agents/main_agent.md (本文件)
+agents/sub_agents/<sub_agent_name>/agent.json
+
+数据与运行产物：
+diary/yyyy-mm-dd.md
+logs/yyyy-mm-dd.log
+
+开发相关：
+tests/
+z/dev_history.md
 
 附：环境与框架：
 运行环境：uv（Python 3.13.9）。
