@@ -39,7 +39,7 @@
 
 编写了AGENT.md，作为Tennisbot的prompt基础
 完善了main.py，src/agent.py的基础架构。
-现在可以启动Tennisbot并让它运行起来。
+现在可以启动Tennisbot并与她对话。
 
 <br>
 
@@ -51,3 +51,5 @@
     - list_files：列出目录结构
     - grep：在文件中搜索关键词
     - apply_patch：应用代码补丁
+完善了developer sub-agent的功能
+现在Tennisbot可以通过developer sub-agent修改自己的代码了。

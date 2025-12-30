@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Run Tennisbot",
+      "label": "Start Tennisbot",
       "type": "shell",
-      "command": "./run.bat",
+      "command": "./start.bat",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -12,8 +12,23 @@
       },
       "options": {
         "statusbar": {
-          "label" : "$(play) Run Tennisbot",
+          "label" : "$(play) Start Tennisbot",
           // "color" : "#5b60df",
+        }
+      }
+    },
+    {
+      "label": "Deploy",
+      "type": "shell",
+      "command": "git add .; git commit -m Update; git push",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "close": true
+      },
+      "options": {
+        "statusbar": {
+          "label" : "$(github) Deploy",
         }
       }
     }

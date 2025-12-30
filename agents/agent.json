@@ -6,6 +6,5 @@
         "grep",
         "openai:WebSearchTool"
     ],
-    "temperature": 1,
-    "instructions": []
+    "temperature": 1
 }

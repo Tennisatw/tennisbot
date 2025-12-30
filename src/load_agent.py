@@ -72,11 +72,8 @@ def load_sub_agents(handoffs):
             tools = load_agent_tools(agent_config.get("tools", []))
 
             temperature = agent_config.get("temperature", 0.5)
-            instructions_original = agent_config.get("instructions", [])
-            if isinstance(instructions_original, list):
-                instructions = "\n".join(instructions_original)
-            else:
-                instructions = instructions_original
+        with open(os.path.join(dir_path, "agent.md"), "r", encoding="utf-8") as f:
+            instructions = f.read()
 
             sub_agents.append(Agent(
                 name=dirs,
