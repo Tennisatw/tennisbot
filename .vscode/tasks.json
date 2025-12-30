@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Tennisbot",
+      "type": "shell",
+      "command": "./run.bat",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "close": true
+      },
+      "options": {
+        "statusbar": {
+          "label" : "$(play) Run Tennisbot",
+          // "color" : "#5b60df",
+        }
+      }
+    }
+  ]
+}

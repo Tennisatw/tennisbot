@@ -1,0 +1,12 @@
+{
+    "schedule": [
+        {
+            "time": "09:00",
+            "action": "alarm"
+        },
+        {
+            "time": "00:00",
+            "action": "daily_summary"
+        }
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "model": "gpt-5.2",
+    "tools": [
+        "list_files",
+        "read_file",
+        "grep",
+        "openai:WebSearchTool"
+    ],
+    "temperature": 1,
+    "instructions": []
+}
