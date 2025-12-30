@@ -1,44 +1,17 @@
 diff --git a/start.bat b/start.bat
 --- a/start.bat
 +++ b/start.bat
-@@ -1 +1,39 @@
-+@echo off
-+setlocal EnableExtensions EnableDelayedExpansion
-+
-+set STOP_CODE=95
-+set MAX_RESTARTS=20
-+set WINDOW_SECONDS=60
-+
-+set RESTART_COUNT=0
-+set WINDOW_START=%TIME%
-+
-+:loop
-+uv run main.py
-+
-+set EXIT_CODE=%ERRORLEVEL%
-+
-+if "%EXIT_CODE%"=="%STOP_CODE%" (
-+  echo [start.bat] Stop code %STOP_CODE% detected, stopping.
-+  exit /b %EXIT_CODE%
-+)
-+
-+for /f "tokens=1-4 delims=:." %%a in ("%TIME%") do set /a NOW_S=%%a*3600+%%b*60+%%c
-+for /f "tokens=1-4 delims=:." %%a in ("%WINDOW_START%") do set /a START_S=%%a*3600+%%b*60+%%c
-+
-+set /a ELAPSED=NOW_S-START_S
-+if !ELAPSED! lss 0 set /a ELAPSED+=86400
-+
-+if !ELAPSED! geq %WINDOW_SECONDS% (
-+  set RESTART_COUNT=0
-+  set WINDOW_START=%TIME%
-+)
-+
-+set /a RESTART_COUNT+=1
-+if !RESTART_COUNT! geq %MAX_RESTARTS% (
-+  echo [start.bat] Too many restarts (!RESTART_COUNT!) within %WINDOW_SECONDS%s, stopping.
-+  exit /b %STOP_CODE%
-+)
-+
-+echo [start.bat] Exit code %EXIT_CODE% detected, restarting...
-+timeout /t 1 /nobreak >nul
-+goto loop
+@@ -11,10 +11,10 @@
+ :loop
+ uv run main.py
+ 
+ set EXIT_CODE=%ERRORLEVEL%
+ 
+ if "%EXIT_CODE%"=="%STOP_CODE%" (
+-  echo [start.bat] Stop code %STOP_CODE% detected, stopping.
+-  exit /b %EXIT_CODE%
++  echo [start.bat] Stop code %STOP_CODE% detected, stopping with exit code 0.
++  exit /b 0
+ )
+ 
+ for /f "tokens=1-4 delims=:." %%a in ("%TIME%") do set /a NOW_S=%%a*3600+%%b*60+%%c

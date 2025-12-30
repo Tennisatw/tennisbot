@@ -14,8 +14,8 @@ uv run main.py
 set EXIT_CODE=%ERRORLEVEL%
 
 if "%EXIT_CODE%"=="%STOP_CODE%" (
-  echo [start.bat] Stop code %STOP_CODE% detected, stopping.
-  exit /b %EXIT_CODE%
+  echo [start.bat] Stop code %STOP_CODE% detected, stopping with exit code 0.
+  exit /b 0
 )
 
 for /f "tokens=1-4 delims=:." %%a in ("%TIME%") do set /a NOW_S=%%a*3600+%%b*60+%%c
