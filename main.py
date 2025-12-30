@@ -1,7 +1,6 @@
 from agents import SQLiteSession
 import asyncio
 import dotenv
-import traceback
 
 from src.run import run
 from src.load_agent import load_main_agent, load_sub_agents
@@ -26,19 +25,7 @@ async def main():
     session = SQLiteSession("tennisbot")
     
     # start the event loop
-    while True:
-        try:
-            await run(agent, session)
-        except (KeyboardInterrupt, SystemExit):
-            print("Exiting...")
-            break
-        except asyncio.CancelledError:
-            print("Task cancelled. Exiting...")
-            break
-        except Exception:
-            print(f"Error occurred")
-            traceback.print_exc()
-            await asyncio.sleep(1)
+    await run(agent, session)
 
 
 if __name__ == "__main__":

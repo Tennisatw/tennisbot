@@ -4,6 +4,7 @@
         "list_files",
         "read_file",
         "grep",
+        "restart",
         "openai:WebSearchTool"
     ],
     "temperature": 1
