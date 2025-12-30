@@ -76,7 +76,7 @@ def load_sub_agents(handoffs):
             instructions = f.read()
 
             sub_agents.append(Agent(
-                name=dirs,
+                name="Tennisbot the " + dirs,
                 instructions=instructions,
                 model=model,
                 tools=tools,

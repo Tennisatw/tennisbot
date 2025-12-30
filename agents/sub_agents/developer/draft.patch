@@ -1,6 +1,14 @@
-diff --git a/tests/_tmp_patch_tool/36dcfad7f73c460eae70f218d4172830.txt b/tests/_tmp_patch_tool/36dcfad7f73c460eae70f218d4172830.txt
-deleted file mode 100644
---- a/tests/_tmp_patch_tool/36dcfad7f73c460eae70f218d4172830.txt
-+++ /dev/null
-@@ -1,1 +0,0 @@
--hello patch tool
+diff --git a/start.bat b/start.bat
+--- a/start.bat
++++ b/start.bat
+@@ -6,8 +6,9 @@
+ set EXIT_CODE=%ERRORLEVEL%
+ 
+ if "%EXIT_CODE%"=="-1" (
+   echo [start.bat] Exit code -1 detected, restarting...
++  timeout /t 1 /nobreak >nul
+   goto loop
+ )
+ 
+ echo [start.bat] Program exited with code %EXIT_CODE%, stopping.
+ exit /b %EXIT_CODE%

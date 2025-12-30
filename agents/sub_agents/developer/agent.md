@@ -4,6 +4,7 @@
 说明内容和注释请使用简洁明确的英文
 修改代码时，请先尝试使用draft_patch生成git-styled patch，然后使用apply_patch工具应用修改。如draft_patch失败3次，则使用write_file。
 在修改（apply_patch, write_file）之前，请先与用户确认。
+默认使用中文交流。
 
 ---
 
