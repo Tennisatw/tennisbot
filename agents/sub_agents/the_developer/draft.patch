@@ -1,54 +1,39 @@
-diff --git a/src/run.py b/src/run.py
---- a/src/run.py
-+++ b/src/run.py
-@@ -1,22 +1,63 @@
- from agents import Runner
-+from src.logger import logger
-+
-+
-+def _log_chat(role: str, content: str, *, agent_name: str | None = None) -> None:
-+    """Log full chat content.
-+
-+    Notes:
-+        - Keep content untruncated for complete transcripts.
-+        - Replace newlines to keep one log line per event.
-+    """
-+
-+    safe = (content or "").replace("\r\n", "\\n").replace("\n", "\\n")
-+    if agent_name:
-+        logger.log(f"chat role={role} agent={agent_name} content={safe}")
-+    else:
-+        logger.log(f"chat role={role} content={safe}")
-+
+diff --git a/src/load_agent.py b/src/load_agent.py
+--- a/src/load_agent.py
++++ b/src/load_agent.py
+@@ -1,6 +1,7 @@
+ import os
+ import json
+ import importlib
  
- async def run(agent, session):
-     
-     # Keep the active agent across turns.
-     # Handoffs only affect the current Runner.run() call unless we persist it.
-     current_agent = agent
-+    turn = 0
+ from agents import Agent, ModelSettings
+ from agents import handoff
+ from src.logger import logger
+ from src.tools import *
+@@ -10,6 +11,7 @@
  
-     while True:
-         user_input = input("User: ")
-+        turn += 1
-+        logger.log(f"chat.turn start turn={turn}")
-+        _log_chat("user", user_input)
-+
-         result = await Runner.run(
-             current_agent,
-             user_input,
-             session = session,
-             max_turns=30,
-         )
+     # Import the agents module to access tool classes
+     agent_module = importlib.import_module("agents")
  
-         last_agent = getattr(result, "last_agent", None)
-         if last_agent is not None:
-             current_agent = last_agent
- 
-         name = getattr(current_agent, "name", "Agent")
-         print(f"{name}: {result.final_output}")
-+        _log_chat("assistant", str(result.final_output), agent_name=name)
-+        logger.log(f"chat.turn end turn={turn}")
- 
-         # TODO：每次会话15分钟后，自动保存会话，并创建新会话
-         # TODO: 异步会话，允许同时处理多个用户请求
+     tools = []
+     for tool_name in tool_names:
+         if tool_name.startswith("openai:"):
+             # "openai:WebSearchTool" -> WebSearchTool
+             tool = getattr(agent_module, tool_name.split("openai:")[1], None)
+             if tool:
+-                tools.append(tool())
++                inst = tool()
++                if tool_name == "openai:WebSearchTool":
++                    inst.on_invoke = lambda *_args, **_kwargs: logger.log("tool.WebSearchTool.invoke")
++                tools.append(inst)
+             else:
+                 print(f"Warning: Tool {tool_name} not found in agents module.")
+         else:
+             # "read_files"
+             # tool = importlib.import_module(f"src.tools.{tool_name}")
+             tool = globals().get(tool_name, None)
+             if tool:
+                 tools.append(tool)
+             else:
+                 print(f"Warning: Tool {tool_name} not found in src.tools.")
+     return tools
