@@ -67,3 +67,9 @@
 此外，也放松了git apply --check的检查："--recount"
 
     uv add pytest-asyncio
+
+新添加了一些对tool的测试
+继续完善了developer sub-agent的功能
+完善了start.bat脚本，现在可以依据返回值决定是否重启
+编写src/logger.py
+整理了handoff逻辑，并使用handoff函数自定义交接。

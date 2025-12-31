@@ -1,28 +1,30 @@
-diff --git a/src/load_agent.py b/src/load_agent.py
---- a/src/load_agent.py
-+++ b/src/load_agent.py
-@@ -47,6 +47,11 @@
-     )
-     return agent
- 
-+
-+def _log_handoff(ctx, input_data, *, to_agent) -> None:
-+    """Log SDK handoff event."""
-+    logger.log(f"handoff from={getattr(ctx.agent, 'name', '-')} to={getattr(to_agent, 'name', '-')}")
-+
-+
- def load_sub_agents(handoffs):
-     # Dynamically load sub-agents from agents/sub_agents/
- 
-     ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-@@ -55,11 +60,7 @@
-     handoff_tools = [
-         handoff(
-             agent=a,
--            on_handoff=lambda ctx, input_data, a=a: logger.log(
--                f"handoff from={getattr(ctx.agent, 'name', '-')} to={getattr(a, 'name', '-')}"
--            ),
-+            on_handoff=lambda ctx, input_data, a=a: _log_handoff(ctx, input_data, to_agent=a),
-         )
-         for a in handoffs
-     ]
+diff --git a/src/logger.py b/src/logger.py
+--- a/src/logger.py
++++ b/src/logger.py
+@@ -22,21 +22,6 @@
+-def _format_fields(fields: dict) -> str:
+-    """Format structured fields into a compact suffix."""
+-
+-    if not fields:
+-        return ""
+-    parts: list[str] = []
+-    for k, v in fields.items():
+-        if k == "output_preview":
+-            parts.append(f"{k}={_normalize_value(v)}")
+-        else:
+-            parts.append(f"{k}={_normalize_value(v)}")
+-    return " | " + " ".join(parts)
+-
+-
+ def logged_tool(fn):
+@@ -52,13 +37,13 @@
+-        msgs = [f"tool.{name}.input"]
++        parts = [f"tool.{name}.input"]
+         for i, arg in enumerate(args):
+-            msgs.append(f" arg{i}={_normalize_value(arg)}")
++            parts.append(f"arg{i}={_normalize_value(arg)}")
+         for k, v in kwargs.items():
+-            msgs.append(f" {k}={_normalize_value(v)}")
+-        logger.log(" ".join(msgs))
++            parts.append(f"{k}={_normalize_value(v)}")
++        logger.log(" ".join(parts))

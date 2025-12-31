@@ -22,20 +22,6 @@ def _normalize_value(v, *, max_len: int | None = 50):
         return _normalize_value(str(v))
 
 
-def _format_fields(fields: dict) -> str:
-    """Format structured fields into a compact suffix."""
-
-    if not fields:
-        return ""
-    parts: list[str] = []
-    for k, v in fields.items():
-        if k == "output_preview":
-            parts.append(f"{k}={_normalize_value(v)}")
-        else:
-            parts.append(f"{k}={_normalize_value(v)}")
-    return " | " + " ".join(parts)
-
-
 def logged_tool(fn):
     """Decorator to auto-log tool input/output.
 
@@ -48,20 +34,21 @@ def logged_tool(fn):
     async def wrapper(*args, **kwargs):
         t0 = time.perf_counter()
         name = getattr(fn, "__name__", "tool")
-        msgs = [f"tool.{name}.input"]
+
+        parts = [f"tool.{name}.input"]
         for i, arg in enumerate(args):
-            msgs.append(f" arg{i}={_normalize_value(arg)}")
+            parts.append(f"arg{i}={_normalize_value(arg)}")
         for k, v in kwargs.items():
-            msgs.append(f" {k}={_normalize_value(v)}")
-        logger.log(" ".join(msgs))
+            parts.append(f"{k}={_normalize_value(v)}")
+        logger.log(" ".join(parts))
 
         output = await fn(*args, **kwargs)
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        msgs = [f"tool.{name}.output success", f" elapsed_ms={elapsed_ms}", "output_preview:"]
+        msgs = [f"tool.{name}.output", f" elapsed_ms={elapsed_ms}", "output_preview:"]
         if isinstance(output, dict):
             for k, v in output.items():
-                msgs.append(f" {k}={_normalize_value(v)}")
+                msgs.append(f"{k}={_normalize_value(v)}")
         elif isinstance(output, str):
             msgs.append(f"{_normalize_value(output)}")
         logger.log(" ".join(msgs))
@@ -95,17 +82,21 @@ class Logger:
 
         logger = logging.getLogger(self.name)
         logger.setLevel(logging.INFO)
-        logger.handlers.clear()
+
+        for h in list(logger.handlers):
+            try:
+                h.close()
+            finally:
+                logger.removeHandler(h)
 
         file_handler = logging.FileHandler(log_path, encoding="utf-8")
         file_handler.setFormatter(formatter)
 
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
+        # console_handler = logging.StreamHandler()
+        # console_handler.setFormatter(formatter)
 
         logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
-        logger.addFilter(_DefaultExtraFilter())
+        # logger.addHandler(console_handler)
 
         object.__setattr__(self, "today", today)
         return logger
@@ -122,14 +113,7 @@ class Logger:
         """Log a message."""
         self._ensure_today_file()
         logging.getLogger(self.name).info(message)
-
-
-class _DefaultExtraFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        if not hasattr(record, "agent"):
-            record.agent = "-"
-        return True
+        print(message)
 
 
 logger = Logger()
-
