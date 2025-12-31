@@ -20,7 +20,7 @@ async def grep(
         query (str): Literal substring to find. Empty query returns no matches.
         root (str): Root directory to search from. Default "." (current working directory).
         ignore (list[str] | None): Glob-style ignore patterns applied to both base names and POSIX-relative paths.
-            - If None, defaults to ['.git', '__pycache__', '.venv'].
+            - If None, defaults to [".git", "__pycache__", ".venv", "logs"].
             - Ignored directories/files are skipped recursively.
         max_matches (int): Maximum number of total matches to return. Default 5000.
         case_sensitive (bool): Whether the search is case-sensitive. Default False.
@@ -50,7 +50,7 @@ async def grep(
 
     # Defaults for ignore patterns
     if ignore is None:
-        ignore = ['.git', '__pycache__', '.venv']
+        ignore = [".git", "__pycache__", ".venv", "logs"]
 
     # Normalize ignore patterns (strip trailing slashes/backslashes)
     norm_pats = [p.rstrip('/').rstrip('\\') for p in ignore]

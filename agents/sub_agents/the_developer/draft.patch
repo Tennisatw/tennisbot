@@ -1,39 +1,21 @@
 diff --git a/src/load_agent.py b/src/load_agent.py
 --- a/src/load_agent.py
 +++ b/src/load_agent.py
-@@ -1,6 +1,7 @@
- import os
- import json
+@@ -4,9 +4,9 @@
  import importlib
+ import inspect
  
  from agents import Agent, ModelSettings
  from agents import handoff
+-from agents.tool import Tool
  from src.logger import logger
  from src.tools import *
-@@ -10,6 +11,7 @@
  
-     # Import the agents module to access tool classes
-     agent_module = importlib.import_module("agents")
  
-     tools = []
-     for tool_name in tool_names:
-         if tool_name.startswith("openai:"):
-             # "openai:WebSearchTool" -> WebSearchTool
-             tool = getattr(agent_module, tool_name.split("openai:")[1], None)
-             if tool:
--                tools.append(tool())
-+                inst = tool()
-+                if tool_name == "openai:WebSearchTool":
-+                    inst.on_invoke = lambda *_args, **_kwargs: logger.log("tool.WebSearchTool.invoke")
-+                tools.append(inst)
-             else:
-                 print(f"Warning: Tool {tool_name} not found in agents module.")
-         else:
-             # "read_files"
-             # tool = importlib.import_module(f"src.tools.{tool_name}")
-             tool = globals().get(tool_name, None)
-             if tool:
-                 tools.append(tool)
-             else:
-                 print(f"Warning: Tool {tool_name} not found in src.tools.")
-     return tools
+-class LoggedOpenaiTool(Tool):
++class LoggedOpenaiTool:
+     """A thin wrapper to log every tool call."""
+ 
+     def __init__(self, inner):
+-        super().__init__()
+         self._inner = inner

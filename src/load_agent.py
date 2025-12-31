@@ -1,11 +1,33 @@
 import os
 import json
 import importlib
+import inspect
 
 from agents import Agent, ModelSettings
 from agents import handoff
 from src.logger import logger
 from src.tools import *
+
+
+# class LoggedOpenaiTool:
+#     """A thin wrapper to log every openai tool call."""
+
+#     def __init__(self, inner):
+#         self._inner = inner
+
+#     @property
+#     def name(self) -> str:
+#         return getattr(self._inner, "name", self._inner.__class__.__name__)
+
+#     def __getattr__(self, item):
+#         return getattr(self._inner, item)
+
+#     async def __call__(self, *args, **kwargs):
+#         logger.log(f"tool.call {self.name} args={args} kwargs={kwargs}")
+#         res = self._inner(*args, **kwargs)
+#         if inspect.isawaitable(res):
+#             return await res
+#         return res
 
 def load_agent_tools(tool_names):
 
@@ -16,14 +38,15 @@ def load_agent_tools(tool_names):
     for tool_name in tool_names:
         if tool_name.startswith("openai:"):
             # "openai:WebSearchTool" -> WebSearchTool
-            tool = getattr(agent_module, tool_name.split("openai:")[1], None)
+            short_name = tool_name.split("openai:")[1]
+            tool = getattr(agent_module, short_name, None)
             if tool:
+                # inst = LoggedOpenaiTool(tool())
                 tools.append(tool())
             else:
                 print(f"Warning: Tool {tool_name} not found in agents module.")
         else:
             # "read_files"
-            # tool = importlib.import_module(f"src.tools.{tool_name}")
             tool = globals().get(tool_name, None)
             if tool:
                 tools.append(tool)

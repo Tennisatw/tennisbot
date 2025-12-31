@@ -13,7 +13,7 @@ async def apply_patch(
     tool: str = "git apply",
     ) -> dict:
     """
-    Apply a unified diff patch file to the current working directory.
+    Apply a unified diff patch file via `git apply --recount`
     Note: Please check with the user before applying any patches.
     Args:
         patch_path (str): Patch file path, default is "agents/sub_agents/the_developer/draft.patch".

@@ -12,8 +12,9 @@ async def draft_patch(
     patch: str,
     ) -> dict:
     """
-    Validate a unified diff patch via `git apply --check` and save it as draft.
+    Validate a unified diff patch via `git apply --check --recount` and save it as draft.
     Note: Don't include the index line in the patch.
+    Note: Patch hunks must include context lines.
     Args:
         patch (str): Unified diff string.
     Returns:

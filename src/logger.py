@@ -113,7 +113,7 @@ class Logger:
         """Log a message."""
         self._ensure_today_file()
         logging.getLogger(self.name).info(message)
-        print(message)
+        print(message if len(message) < 100 else message[:97] + "...")
 
 
 logger = Logger()
