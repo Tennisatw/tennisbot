@@ -1,22 +1,73 @@
+import time
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
 
 
-def _normalize_value(v):
+def _normalize_value(v, *, max_len: int | None = 50):
     """Normalize log field values.
 
     - Replace newlines with literal "\\n".
-    - Truncate long strings to 50 chars.
+    - Optionally truncate long strings.
     """
 
     if isinstance(v, str):
-        if len(v) > 50:
-            v = v[:50]
         v = v.replace("\r\n", "\\n").replace("\n", "\\n")
+        if max_len is not None and len(v) > max_len:
+            v = v[:max_len]
         return v
-    return v
+    else:
+        return _normalize_value(str(v))
+
+
+def _format_fields(fields: dict) -> str:
+    """Format structured fields into a compact suffix."""
+
+    if not fields:
+        return ""
+    parts: list[str] = []
+    for k, v in fields.items():
+        if k == "output_preview":
+            parts.append(f"{k}={_normalize_value(v)}")
+        else:
+            parts.append(f"{k}={_normalize_value(v)}")
+    return " | " + " ".join(parts)
+
+
+def logged_tool(fn):
+    """Decorator to auto-log tool input/output.
+
+    Logs:
+        - tool.<name>.input: args/kwargs
+        - tool.<name>.output: success/elapsed_ms + output preview or error
+    """
+
+    @wraps(fn)
+    async def wrapper(*args, **kwargs):
+        t0 = time.perf_counter()
+        name = getattr(fn, "__name__", "tool")
+        msgs = [f"tool.{name}.input"]
+        for i, arg in enumerate(args):
+            msgs.append(f" arg{i}={_normalize_value(arg)}")
+        for k, v in kwargs.items():
+            msgs.append(f" {k}={_normalize_value(v)}")
+        logger.log(" ".join(msgs))
+
+        output = await fn(*args, **kwargs)
+
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        msgs = [f"tool.{name}.output success", f" elapsed_ms={elapsed_ms}", "output_preview:"]
+        if isinstance(output, dict):
+            for k, v in output.items():
+                msgs.append(f" {k}={_normalize_value(v)}")
+        elif isinstance(output, str):
+            msgs.append(f"{_normalize_value(output)}")
+        logger.log(" ".join(msgs))
+        return output
+
+    return wrapper
 
 
 @dataclass(frozen=True)
@@ -28,7 +79,7 @@ class Logger:
         - Use `log` for structured events.
     """
 
-    name: str = "tennisbot"
+    name: str = "default"
 
     def setup(self) -> logging.Logger:
         """Configure logging to console and logs/YYYY-MM-DD.log."""
@@ -37,7 +88,7 @@ class Logger:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / f"{datetime.now().strftime('%Y-%m-%d')}.log"
 
-        fmt = "%(asctime)s | %(levelname)s | %(name)s | %(message)s | %(agent)s"
+        fmt = "%(asctime)s | %(levelname)s | %(message)s "
         formatter = logging.Formatter(fmt)
 
         logger = logging.getLogger(self.name)
@@ -55,13 +106,9 @@ class Logger:
         logger.addFilter(_DefaultExtraFilter())
         return logger
 
-    def log(self, event: str, *, agent: str | None = None, **fields) -> None:
-        """Log a structured event."""
-
-        extra = {"agent": agent or "-"}
-        for k, v in fields.items():
-            extra[k] = _normalize_value(v)
-        logging.getLogger(self.name).info(event, extra=extra)
+    def log(self, message) -> None:
+        """Log a message."""
+        logging.getLogger(self.name).info(message)
 
 
 class _DefaultExtraFilter(logging.Filter):
@@ -72,3 +119,4 @@ class _DefaultExtraFilter(logging.Filter):
 
 
 logger = Logger()
+

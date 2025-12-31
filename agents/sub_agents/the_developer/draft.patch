@@ -1,74 +1,24 @@
 diff --git a/src/logger.py b/src/logger.py
 --- a/src/logger.py
 +++ b/src/logger.py
-@@ -1,53 +1,74 @@
- import logging
- from dataclasses import dataclass
- from datetime import datetime
- from pathlib import Path
+@@ -100,6 +100,7 @@
  
- 
- def _normalize_value(v):
-     """Normalize log field values.
- 
-     - Replace newlines with literal "\\n".
-     - Truncate long strings to 50 chars.
-     """
- 
-     if isinstance(v, str):
--        if len(v) > 50:
--            v = v[:50]
-         v = v.replace("\r\n", "\\n").replace("\n", "\\n")
-+        if len(v) > 50:
-+            v = v[:50]
-         return v
-     return v
-+
-+
-+def _format_fields(fields: dict) -> str:
-+    """Format structured fields into a compact suffix."""
-+
-+    if not fields:
-+        return ""
-+    parts: list[str] = []
-+    for k, v in fields.items():
-+        parts.append(f"{k}={_normalize_value(v)}")
-+    return " | " + " ".join(parts)
- 
- 
- @dataclass(frozen=True)
- class Logger:
-     """App logger wrapper.
-@@ -56,7 +77,7 @@
-     name: str = "tennisbot"
- 
-     def setup(self) -> logging.Logger:
-         """Configure logging to console and logs/YYYY-MM-DD.log."""
- 
-         log_dir = Path("logs")
-         log_dir.mkdir(parents=True, exist_ok=True)
-         log_path = log_dir / f"{datetime.now().strftime('%Y-%m-%d')}.log"
-@@ -77,17 +98,21 @@
+         logger.addHandler(file_handler)
+         logger.addHandler(console_handler)
          logger.addFilter(_DefaultExtraFilter())
++        logger._tennisbot_log_date = datetime.now().strftime("%Y-%m-%d")
          return logger
- 
-     def log(self, event: str, *, agent: str | None = None, **fields) -> None:
-         """Log a structured event."""
- 
--        extra = {"agent": agent or "-"}
--        for k, v in fields.items():
--            extra[k] = _normalize_value(v)
--        logging.getLogger(self.name).info(event, extra=extra)
-+        extra = {"agent": agent or "-"}
-+        msg = event + _format_fields(fields)
-+        logging.getLogger(self.name).info(msg, extra=extra)
- 
- 
- class _DefaultExtraFilter(logging.Filter):
-     def filter(self, record: logging.LogRecord) -> bool:
-         if not hasattr(record, "agent"):
-             record.agent = "-"
-         return True
- 
- 
- logger = Logger()
++
++    def _ensure_today_file(self) -> None:
++        """Re-setup logger if date changed."""
++
++        lg = logging.getLogger(self.name)
++        today = datetime.now().strftime("%Y-%m-%d")
++        if getattr(lg, "_tennisbot_log_date", None) == today:
++            return
++        self.setup()
+@@ -107,6 +118,7 @@
+     def log(self, message) -> None:
+         """Log a message."""
++        self._ensure_today_file()
+         logging.getLogger(self.name).info(message)
