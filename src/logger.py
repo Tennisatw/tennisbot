@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
-class AppLogger:
+class Logger:
     """App logger wrapper.
 
     Notes:
@@ -54,4 +54,4 @@ class _DefaultExtraFilter(logging.Filter):
         return True
 
 
-app_logger = AppLogger()
+logger = Logger()

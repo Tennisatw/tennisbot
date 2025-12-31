@@ -1,124 +1,39 @@
-diff --git a/src/logging.py b/src/logging.py
-deleted file mode 100644
---- a/src/logging.py
-+++ /dev/null
-@@ -1,62 +0,0 @@
--import logging
--from dataclasses import dataclass
--from datetime import datetime
--from pathlib import Path
--
--
--@dataclass(frozen=True)
--class AppLogger:
--    """App logger wrapper.
--
--    Notes:
--        - Use `setup()` once at startup.
--        - Use `log` for structured events.
--    """
--
--    name: str = "tennisbot"
--
--    def setup(self) -> logging.Logger:
--        """Configure logging to console and logs/YYYY-MM-DD.log."""
--
--        log_dir = Path("logs")
--        log_dir.mkdir(parents=True, exist_ok=True)
--        log_path = log_dir / f"{datetime.now().strftime('%Y-%m-%d')}.log"
--
--        fmt = "%(asctime)s | %(levelname)s | %(name)s | %(message)s | %(agent)s"
--        formatter = logging.Formatter(fmt)
--
--        logger = logging.getLogger(self.name)
--        logger.setLevel(logging.INFO)
--        logger.handlers.clear()
--
--        file_handler = logging.FileHandler(log_path, encoding="utf-8")
--        file_handler.setFormatter(formatter)
--
--        console_handler = logging.StreamHandler()
--        console_handler.setFormatter(formatter)
--
--        logger.addHandler(file_handler)
--        logger.addHandler(console_handler)
--        logger.addFilter(_DefaultExtraFilter())
--        return logger
--
--    def log(self, event: str, *, agent: str | None = None, **fields) -> None:
--        """Log a structured event."""
--
--        extra = {"agent": agent or "-", **fields}
--        logging.getLogger(self.name).info(event, extra=extra)
--
--
--class _DefaultExtraFilter(logging.Filter):
--    def filter(self, record: logging.LogRecord) -> bool:
--        if not hasattr(record, "agent"):
--            record.agent = "-"
--        return True
--
--
--app_logger = AppLogger()
-diff --git a/src/logger.py b/src/logger.py
-new file mode 100644
---- /dev/null
-+++ b/src/logger.py
-@@ -0,0 +1,62 @@
-+import logging
-+from dataclasses import dataclass
-+from datetime import datetime
-+from pathlib import Path
+diff --git a/src/tools/read_file.py b/src/tools/read_file.py
+--- a/src/tools/read_file.py
++++ b/src/tools/read_file.py
+@@ -1,4 +1,6 @@
+ from agents import function_tool
++from src.logger import logger
 +
+ 
+ @function_tool
+ async def read_file(
+@@ -16,19 +18,26 @@
+             "error": str | None,
+         }
+     """
+     print(f"Reading file: {path}")
++    logger.log("tool.read_file.input", path=path)
+     try:
+         with open(path, "r", encoding="utf-8", errors="ignore") as f:
+             contents = f.read()
 +
-+@dataclass(frozen=True)
-+class AppLogger:
-+    """App logger wrapper.
++            preview = contents.replace("\r\n", "\\n").replace("\n", "\\n")
++            if len(preview) > 50:
++                preview = preview[:50]
++            logger.log("tool.read_file.output", success=True, content_preview=preview, content_len=len(contents))
 +
-+    Notes:
-+        - Use `setup()` once at startup.
-+        - Use `log` for structured events.
-+    """
-+
-+    name: str = "tennisbot"
-+
-+    def setup(self) -> logging.Logger:
-+        """Configure logging to console and logs/YYYY-MM-DD.log."""
-+
-+        log_dir = Path("logs")
-+        log_dir.mkdir(parents=True, exist_ok=True)
-+        log_path = log_dir / f"{datetime.now().strftime('%Y-%m-%d')}.log"
-+
-+        fmt = "%(asctime)s | %(levelname)s | %(name)s | %(message)s | %(agent)s"
-+        formatter = logging.Formatter(fmt)
-+
-+        logger = logging.getLogger(self.name)
-+        logger.setLevel(logging.INFO)
-+        logger.handlers.clear()
-+
-+        file_handler = logging.FileHandler(log_path, encoding="utf-8")
-+        file_handler.setFormatter(formatter)
-+
-+        console_handler = logging.StreamHandler()
-+        console_handler.setFormatter(formatter)
-+
-+        logger.addHandler(file_handler)
-+        logger.addHandler(console_handler)
-+        logger.addFilter(_DefaultExtraFilter())
-+        return logger
-+
-+    def log(self, event: str, *, agent: str | None = None, **fields) -> None:
-+        """Log a structured event."""
-+
-+        extra = {"agent": agent or "-", **fields}
-+        logging.getLogger(self.name).info(event, extra=extra)
-+
-+
-+class _DefaultExtraFilter(logging.Filter):
-+    def filter(self, record: logging.LogRecord) -> bool:
-+        if not hasattr(record, "agent"):
-+            record.agent = "-"
-+        return True
-+
-+
-+app_logger = AppLogger()
+             return {
+                 "success": True,
+                 "content": contents,
+                 "error": None,
+             }
+     except Exception as e:
++        err = str(e)
++        logger.log("tool.read_file.output", success=False, error=err)
+         return {
+             "success": False,
+             "content": None,
+-            "error": str(e),
++            "error": err,
+         }
