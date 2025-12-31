@@ -16,7 +16,7 @@ def _normalize_value(v, *, max_len: int | None = 100):
     if isinstance(v, str):
         v = v.replace("\r\n", "\\n").replace("\n", "\\n")
         if max_len is not None and len(v) > max_len:
-            v = v[:max_len]
+            v = v[:max_len] + "..."
         return v
     else:
         return _normalize_value(str(v))
@@ -45,7 +45,7 @@ def logged_tool(fn):
         output = await fn(*args, **kwargs)
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        msgs = [f"tool.{name}.output", f" elapsed_ms={elapsed_ms}", "output_preview:"]
+        msgs = [f"tool.{name}.output", f"elapsed_ms={elapsed_ms}", "output:"]
         if isinstance(output, dict):
             for k, v in output.items():
                 msgs.append(f"{k}={_normalize_value(v)}")
@@ -113,7 +113,7 @@ class Logger:
         """Log a message."""
         self._ensure_today_file()
         logging.getLogger(self.name).info(message)
-        print(message if len(message) < 100 else message[:97] + "...")
+        print(message if len(message) < 80 else message[:77] + "...")
 
 
 logger = Logger()

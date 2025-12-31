@@ -1,0 +1,43 @@
+# Test run_shell tool
+
+from pathlib import Path
+import sys
+import json
+
+import pytest
+
+# Ensure repo root is importable so `import src...` works under pytest/uv on Windows
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.tools.run_shell import run_shell
+
+
+@pytest.mark.asyncio
+async def test_run_shell_cmd_echo():
+    res = await run_shell.on_invoke_tool(None, json.dumps({"command": "echo hello", "shell": "cmd"})) # type: ignore
+    assert res["exit_code"] == 0
+    assert "hello" in res["stdout"].lower()
+
+
+@pytest.mark.asyncio
+async def test_run_shell_powershell_write_output():
+    res = await run_shell.on_invoke_tool(
+        None,
+        json.dumps({"command": "Write-Output 'hello'", "shell": "powershell"}),
+    ) # type: ignore
+    assert res["exit_code"] == 0
+    assert "hello" in res["stdout"].lower()
+
+
+@pytest.mark.asyncio
+async def test_run_shell_cwd_affects_relative_paths(tmp_path: Path):
+    # Create a file in tmp_path and read it via relative path.
+    (tmp_path / "a.txt").write_text("hello", encoding="utf-8")
+
+    res = await run_shell.on_invoke_tool(
+        None,
+        json.dumps({"command": "type a.txt", "shell": "cmd", "cwd": str(tmp_path)}),
+    ) # type: ignore
+
+    assert res["exit_code"] == 0
+    assert "hello" in res["stdout"].lower()
