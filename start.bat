@@ -36,6 +36,6 @@ if !RESTART_COUNT! geq %MAX_RESTARTS% (
   exit /b %STOP_CODE%
 )
 
-echo [start.bat] Exit code %EXIT_CODE% detected, restarting...
+echo [start.bat] Restart code %EXIT_CODE% detected, restarting...
 timeout /t 1 /nobreak >nul
 goto loop

@@ -8,9 +8,6 @@ async def run(agent, session):
 
     while True:
         user_input = input("User: ")
-        if user_input.lower() in ["exit", "quit"]:
-            print("Exiting the event loop.")
-            raise KeyboardInterrupt
         result = await Runner.run(
             current_agent,
             user_input,
@@ -21,11 +18,9 @@ async def run(agent, session):
         last_agent = getattr(result, "last_agent", None)
         if last_agent is not None:
             current_agent = last_agent
-            name = getattr(last_agent, "name", "Agent")
-        else:
-            name = getattr(current_agent, "name", "Agent")
 
+        name = getattr(current_agent, "name", "Agent")
         print(f"{name}: {result.final_output}")
 
-        # TODO：每次会话半小时后，自动保存会话，并创建新会话
+        # TODO：每次会话15分钟后，自动保存会话，并创建新会话
         # TODO: 异步会话，允许同时处理多个用户请求
