@@ -12,6 +12,7 @@ async def apply_patch(
     ) -> dict:
     """
     Apply a unified diff patch file to the current working directory.
+    Note: Please check with the user before applying any patches.
     Args:
         patch_path (str): Patch file path.
         tool (str): "git apply" or "patch". Tool to use for applying the patch. Default is "git apply".
