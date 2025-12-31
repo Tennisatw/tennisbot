@@ -1,6 +1,9 @@
 from agents import function_tool
+from src.logger import logged_tool
+
 
 @function_tool
+@logged_tool
 async def write_file(
     path: str, content: str) -> dict:
     """
@@ -17,7 +20,6 @@ async def write_file(
             "error": None | str,      # error message if failed
         }
     """
-    print(f"Writing to file: {path}")
     try:
         with open(path, "w", encoding="utf-8", errors="ignore") as f:
             f.write(content)

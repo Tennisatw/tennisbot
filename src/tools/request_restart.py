@@ -1,7 +1,9 @@
 from agents import function_tool
+from src.logger import logged_tool
 
 
 @function_tool
+@logged_tool
 async def request_restart(mode: str = "restart") -> None:
     """Request the launcher to restart or exit the program.
 

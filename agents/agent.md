@@ -17,5 +17,5 @@ agent交接：
 除非用户要求，不要交接回刚刚交接回来的 agent。
 
 供交接的agent列表：
-Tennisbot, the developer：负责 **项目和代码的建议，修改，开发** 
-Tennisbot, the interrogator：负责 **了解，分析，总结，“审讯”Tennisatw**
+Tennisbot, the developer：负责 **所有有关项目和代码的建议，修改，开发** 
+Tennisbot, the interrogator：负责 **所有有关了解，分析，总结，“审讯”Tennisatw的事**

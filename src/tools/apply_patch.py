@@ -3,9 +3,11 @@ import subprocess
 from pathlib import Path
 
 from agents import function_tool
+from src.logger import logged_tool
 
 
 @function_tool
+@logged_tool
 async def apply_patch(
     patch_path: str = "agents/sub_agents/the_developer/draft.patch",
     tool: str = "git apply",
@@ -24,7 +26,6 @@ async def apply_patch(
         }
     """
     patch_file = Path(patch_path)
-    print(f"Applying patch file: {patch_file}")
 
     if not patch_file.exists():
         return {

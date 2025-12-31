@@ -2,8 +2,11 @@ import os
 import fnmatch
 
 from agents import function_tool
+from src.logger import logged_tool
+
 
 @function_tool
+@logged_tool
 async def grep(
     query: str, 
     root: str = ".",
@@ -33,9 +36,6 @@ async def grep(
             "truncated": bool,       # True if match limit reached
         }
     """
-
-    # TODO: add logging
-    print(f"Grep root: {root}, query: {query!r}, case_sensitive: {case_sensitive}, max_matches: {max_matches}, ignore: {ignore}")
 
     # Early return for empty query
     if not query:
@@ -148,7 +148,6 @@ async def grep(
             except Exception as e:
                 # Swallow file-specific errors and continue; we only record matches.
                 # Keeping it simple: no per-file error reporting.
-                print(f"Failed to read {abs_file}: {e!r}")
                 continue
 
             if truncated:

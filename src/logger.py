@@ -80,13 +80,15 @@ class Logger:
     """
 
     name: str = "default"
+    today: str = ""
 
     def setup(self) -> logging.Logger:
         """Configure logging to console and logs/YYYY-MM-DD.log."""
 
         log_dir = Path("logs")
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"{datetime.now().strftime('%Y-%m-%d')}.log"
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_path = log_dir / f"{today}.log"
 
         fmt = "%(asctime)s | %(levelname)s | %(message)s "
         formatter = logging.Formatter(fmt)
@@ -104,10 +106,21 @@ class Logger:
         logger.addHandler(file_handler)
         logger.addHandler(console_handler)
         logger.addFilter(_DefaultExtraFilter())
+
+        object.__setattr__(self, "today", today)
         return logger
+
+    def _ensure_today_file(self) -> None:
+        """Re-setup logger if date changed."""
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        if self.today == today:
+            return
+        self.setup()
 
     def log(self, message) -> None:
         """Log a message."""
+        self._ensure_today_file()
         logging.getLogger(self.name).info(message)
 
 

@@ -3,9 +3,11 @@ import subprocess
 from pathlib import Path
 
 from agents import function_tool
+from src.logger import logged_tool
 
 
 @function_tool
+@logged_tool
 async def draft_patch(
     patch: str,
     ) -> dict:
@@ -31,7 +33,6 @@ diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/th
 +Hello world
 ```
     """
-    print(f"Drafting patch:\n{patch}")
 
     if " a/" not in patch and " b/" not in patch:
         path_strip = 0

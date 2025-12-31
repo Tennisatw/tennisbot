@@ -2,8 +2,11 @@ import os
 import fnmatch
 
 from agents import function_tool
+from src.logger import logged_tool
+
 
 @function_tool
+@logged_tool
 async def list_files(
     root: str, 
     ignore: list[str] | None = None) -> dict:
@@ -25,9 +28,6 @@ async def list_files(
               "error": None | str (repr(Exception)),
             }
     """
-
-    # TODO: add logging
-    print(f"Listing files in: {root}, ignore: {ignore}")
 
     # defaults
     if ignore is None:
