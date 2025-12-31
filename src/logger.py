@@ -109,7 +109,7 @@ class Logger:
             return
         self.setup()
 
-    def log(self, message) -> None:
+    def log(self, message: str) -> None:
         """Log a message."""
         self._ensure_today_file()
         logging.getLogger(self.name).info(message)

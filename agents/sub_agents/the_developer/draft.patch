@@ -1,30 +1,54 @@
-diff --git a/src/logger.py b/src/logger.py
---- a/src/logger.py
-+++ b/src/logger.py
-@@ -22,21 +22,6 @@
--def _format_fields(fields: dict) -> str:
--    """Format structured fields into a compact suffix."""
--
--    if not fields:
--        return ""
--    parts: list[str] = []
--    for k, v in fields.items():
--        if k == "output_preview":
--            parts.append(f"{k}={_normalize_value(v)}")
--        else:
--            parts.append(f"{k}={_normalize_value(v)}")
--    return " | " + " ".join(parts)
--
--
- def logged_tool(fn):
-@@ -52,13 +37,13 @@
--        msgs = [f"tool.{name}.input"]
-+        parts = [f"tool.{name}.input"]
-         for i, arg in enumerate(args):
--            msgs.append(f" arg{i}={_normalize_value(arg)}")
-+            parts.append(f"arg{i}={_normalize_value(arg)}")
-         for k, v in kwargs.items():
--            msgs.append(f" {k}={_normalize_value(v)}")
--        logger.log(" ".join(msgs))
-+            parts.append(f"{k}={_normalize_value(v)}")
-+        logger.log(" ".join(parts))
+diff --git a/src/run.py b/src/run.py
+--- a/src/run.py
++++ b/src/run.py
+@@ -1,22 +1,63 @@
+ from agents import Runner
++from src.logger import logger
++
++
++def _log_chat(role: str, content: str, *, agent_name: str | None = None) -> None:
++    """Log full chat content.
++
++    Notes:
++        - Keep content untruncated for complete transcripts.
++        - Replace newlines to keep one log line per event.
++    """
++
++    safe = (content or "").replace("\r\n", "\\n").replace("\n", "\\n")
++    if agent_name:
++        logger.log(f"chat role={role} agent={agent_name} content={safe}")
++    else:
++        logger.log(f"chat role={role} content={safe}")
++
+ 
+ async def run(agent, session):
+     
+     # Keep the active agent across turns.
+     # Handoffs only affect the current Runner.run() call unless we persist it.
+     current_agent = agent
++    turn = 0
+ 
+     while True:
+         user_input = input("User: ")
++        turn += 1
++        logger.log(f"chat.turn start turn={turn}")
++        _log_chat("user", user_input)
++
+         result = await Runner.run(
+             current_agent,
+             user_input,
+             session = session,
+             max_turns=30,
+         )
+ 
+         last_agent = getattr(result, "last_agent", None)
+         if last_agent is not None:
+             current_agent = last_agent
+ 
+         name = getattr(current_agent, "name", "Agent")
+         print(f"{name}: {result.final_output}")
++        _log_chat("assistant", str(result.final_output), agent_name=name)
++        logger.log(f"chat.turn end turn={turn}")
+ 
+         # TODO：每次会话15分钟后，自动保存会话，并创建新会话
+         # TODO: 异步会话，允许同时处理多个用户请求
