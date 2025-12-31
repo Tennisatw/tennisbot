@@ -50,7 +50,7 @@ async def apply_patch(
         git_path = shutil.which("git")
         if git_path:
             check_proc = subprocess.run(
-                [git_path, "apply", "--check", "--ignore-whitespace", "--recount", f"-p{path_strip}", str(patch_file)],
+                [git_path, "apply", "--check", "--recount", f"-p{path_strip}", str(patch_file)],
                 text=True,
                 encoding="utf-8",
                 capture_output=True,
@@ -59,7 +59,7 @@ async def apply_patch(
             )
             if check_proc.returncode == 0:
                 proc = subprocess.run(
-                    [git_path, "apply", "--ignore-whitespace", "--recount", f"-p{path_strip}", str(patch_file)],
+                    [git_path, "apply", "--recount", f"-p{path_strip}", str(patch_file)],
                     text=True,
                     encoding="utf-8",
                     capture_output=True,

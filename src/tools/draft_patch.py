@@ -51,7 +51,7 @@ diff --git a/agents/sub_agents/developer/template.txt b/agents/sub_agents/develo
     draft_path.write_text(patch, encoding="utf-8")
 
     proc = subprocess.run(
-        [git_path, "apply", "--check", "--ignore-whitespace", "--recount", f"-p{path_strip}", str(draft_path)],
+        [git_path, "apply", "--check", "--recount", f"-p{path_strip}", str(draft_path)],
         text=True,
         encoding="utf-8",
         capture_output=True,

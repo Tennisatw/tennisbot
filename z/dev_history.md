@@ -64,6 +64,6 @@
 将其拆分成了2个工具：
     - draft_patch：生成git-styled patch
     - apply_patch（新）：应用git-styled patch
-此外，也放松了git apply --check的检查： "--ignore-whitespace", "--recount"
+此外，也放松了git apply --check的检查："--recount"
 
     uv add pytest-asyncio

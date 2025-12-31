@@ -4,6 +4,8 @@
         "list_files",
         "read_file",
         "grep",
+        "draft_patch",
+        "apply_patch",
         "request_restart",
         "openai:WebSearchTool"
     ],
