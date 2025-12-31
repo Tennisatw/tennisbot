@@ -4,6 +4,21 @@ from datetime import datetime
 from pathlib import Path
 
 
+def _normalize_value(v):
+    """Normalize log field values.
+
+    - Replace newlines with literal "\\n".
+    - Truncate long strings to 50 chars.
+    """
+
+    if isinstance(v, str):
+        if len(v) > 50:
+            v = v[:50]
+        v = v.replace("\r\n", "\\n").replace("\n", "\\n")
+        return v
+    return v
+
+
 @dataclass(frozen=True)
 class Logger:
     """App logger wrapper.
@@ -43,7 +58,9 @@ class Logger:
     def log(self, event: str, *, agent: str | None = None, **fields) -> None:
         """Log a structured event."""
 
-        extra = {"agent": agent or "-", **fields}
+        extra = {"agent": agent or "-"}
+        for k, v in fields.items():
+            extra[k] = _normalize_value(v)
         logging.getLogger(self.name).info(event, extra=extra)
 
 

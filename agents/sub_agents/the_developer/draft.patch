@@ -1,39 +1,74 @@
-diff --git a/src/tools/read_file.py b/src/tools/read_file.py
---- a/src/tools/read_file.py
-+++ b/src/tools/read_file.py
-@@ -1,4 +1,6 @@
- from agents import function_tool
-+from src.logger import logger
-+
+diff --git a/src/logger.py b/src/logger.py
+--- a/src/logger.py
++++ b/src/logger.py
+@@ -1,53 +1,74 @@
+ import logging
+ from dataclasses import dataclass
+ from datetime import datetime
+ from pathlib import Path
  
- @function_tool
- async def read_file(
-@@ -16,19 +18,26 @@
-             "error": str | None,
-         }
+ 
+ def _normalize_value(v):
+     """Normalize log field values.
+ 
+     - Replace newlines with literal "\\n".
+     - Truncate long strings to 50 chars.
      """
-     print(f"Reading file: {path}")
-+    logger.log("tool.read_file.input", path=path)
-     try:
-         with open(path, "r", encoding="utf-8", errors="ignore") as f:
-             contents = f.read()
+ 
+     if isinstance(v, str):
+-        if len(v) > 50:
+-            v = v[:50]
+         v = v.replace("\r\n", "\\n").replace("\n", "\\n")
++        if len(v) > 50:
++            v = v[:50]
+         return v
+     return v
 +
-+            preview = contents.replace("\r\n", "\\n").replace("\n", "\\n")
-+            if len(preview) > 50:
-+                preview = preview[:50]
-+            logger.log("tool.read_file.output", success=True, content_preview=preview, content_len=len(contents))
 +
-             return {
-                 "success": True,
-                 "content": contents,
-                 "error": None,
-             }
-     except Exception as e:
-+        err = str(e)
-+        logger.log("tool.read_file.output", success=False, error=err)
-         return {
-             "success": False,
-             "content": None,
--            "error": str(e),
-+            "error": err,
-         }
++def _format_fields(fields: dict) -> str:
++    """Format structured fields into a compact suffix."""
++
++    if not fields:
++        return ""
++    parts: list[str] = []
++    for k, v in fields.items():
++        parts.append(f"{k}={_normalize_value(v)}")
++    return " | " + " ".join(parts)
+ 
+ 
+ @dataclass(frozen=True)
+ class Logger:
+     """App logger wrapper.
+@@ -56,7 +77,7 @@
+     name: str = "tennisbot"
+ 
+     def setup(self) -> logging.Logger:
+         """Configure logging to console and logs/YYYY-MM-DD.log."""
+ 
+         log_dir = Path("logs")
+         log_dir.mkdir(parents=True, exist_ok=True)
+         log_path = log_dir / f"{datetime.now().strftime('%Y-%m-%d')}.log"
+@@ -77,17 +98,21 @@
+         logger.addFilter(_DefaultExtraFilter())
+         return logger
+ 
+     def log(self, event: str, *, agent: str | None = None, **fields) -> None:
+         """Log a structured event."""
+ 
+-        extra = {"agent": agent or "-"}
+-        for k, v in fields.items():
+-            extra[k] = _normalize_value(v)
+-        logging.getLogger(self.name).info(event, extra=extra)
++        extra = {"agent": agent or "-"}
++        msg = event + _format_fields(fields)
++        logging.getLogger(self.name).info(msg, extra=extra)
+ 
+ 
+ class _DefaultExtraFilter(logging.Filter):
+     def filter(self, record: logging.LogRecord) -> bool:
+         if not hasattr(record, "agent"):
+             record.agent = "-"
+         return True
+ 
+ 
+ logger = Logger()

@@ -4,12 +4,14 @@ import dotenv
 
 from src.run import run
 from src.load_agent import load_main_agent, load_sub_agents
+from src.logger import logger
 
 async def main():
     # load environment variables
     dotenv.load_dotenv()
 
-    # TODO: start logging
+    logger.setup()
+    logger.log("app.start")
 
     # TODO: load settings
 
@@ -26,6 +28,8 @@ async def main():
     
     # start the event loop
     await run(agent, session)
+
+    logger.log("app.end")
 
 
 if __name__ == "__main__":
