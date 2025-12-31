@@ -7,14 +7,14 @@ from agents import function_tool
 
 @function_tool
 async def apply_patch(
-    patch_path: str,
+    patch_path: str = "agents/sub_agents/the_developer/draft.patch",
     tool: str = "git apply",
     ) -> dict:
     """
     Apply a unified diff patch file to the current working directory.
     Note: Please check with the user before applying any patches.
     Args:
-        patch_path (str): Patch file path.
+        patch_path (str): Patch file path, default is "agents/sub_agents/the_developer/draft.patch".
         tool (str): "git apply" or "patch". Tool to use for applying the patch. Default is "git apply".
     Returns:
         dict: {
