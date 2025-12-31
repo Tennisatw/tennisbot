@@ -3,6 +3,8 @@ import json
 import importlib
 
 from agents import Agent, ModelSettings
+from agents import handoff
+from src.logger import logger
 from src.tools import *
 
 def load_agent_tools(tool_names):
@@ -54,6 +56,7 @@ def load_main_agent():
     )
     return agent
 
+
 def load_sub_agents(handoffs):
     # Dynamically load sub-agents from agents/sub_agents/
 
@@ -90,3 +93,22 @@ def load_sub_agents(handoffs):
             ))
 
     return sub_agents
+
+def create_handoff_obj(agent):
+    if agent.name == "Tennisbot":
+        with open("agents/agent.json", "r", encoding="utf-8") as f:
+            agent_config = json.load(f)
+            tool_description = agent_config.get("handoff_description", "")
+    else:
+        folder_name = agent.name.replace("Tennisbot ", "")
+        with open(f"agents/sub_agents/{folder_name}/agent.json", "r", encoding="utf-8") as f:
+            agent_config = json.load(f)
+            tool_description = agent_config.get("handoff_description", "")
+
+    handoff_obj = handoff(
+        agent=agent,
+        on_handoff=lambda _: logger.log(f"agent.handoff to {agent.name}"),
+        tool_description_override=tool_description
+    )
+
+    return handoff_obj

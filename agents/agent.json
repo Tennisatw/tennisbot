@@ -9,5 +9,6 @@
         "request_restart",
         "openai:WebSearchTool"
     ],
-    "temperature": 1
+    "temperature": 1,
+    "handoff_description": "For coordination of tasks that do not fall under your responsibilities, or to indicate that your tasks have been completed."
 }

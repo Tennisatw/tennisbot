@@ -1,40 +1,28 @@
 diff --git a/src/load_agent.py b/src/load_agent.py
 --- a/src/load_agent.py
 +++ b/src/load_agent.py
-@@ -2,9 +2,11 @@
- import os
- import json
- import importlib
+@@ -47,6 +47,11 @@
+     )
+     return agent
  
- from agents import Agent, ModelSettings
-+from agents import handoff
-+from src.logger import logger
- from src.tools import *
-@@ -54,6 +56,13 @@
++
++def _log_handoff(ctx, input_data, *, to_agent) -> None:
++    """Log SDK handoff event."""
++    logger.log(f"handoff from={getattr(ctx.agent, 'name', '-')} to={getattr(to_agent, 'name', '-')}")
++
++
  def load_sub_agents(handoffs):
      # Dynamically load sub-agents from agents/sub_agents/
  
      ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+
-+    handoff_tools = [
-+        handoff(
-+            agent=a,
-+            on_handoff=lambda ctx, input_data, a=a: logger.log(
-+                f"handoff from={getattr(ctx.agent, 'name', '-')} to={getattr(a, 'name', '-')}"
-+            ),
-+        )
-+        for a in handoffs
-+    ]
- 
-     sub_agents = []
-     for dirs in os.listdir("agents/sub_agents"):
-@@ -88,7 +97,7 @@
-                 model_settings=ModelSettings(
-                     temperature=temperature,
-                     max_tokens=2048,
-                 ),
--                handoffs=handoffs,
-+                handoffs=handoff_tools,
-             ))
- 
-     return sub_agents
+@@ -55,11 +60,7 @@
+     handoff_tools = [
+         handoff(
+             agent=a,
+-            on_handoff=lambda ctx, input_data, a=a: logger.log(
+-                f"handoff from={getattr(ctx.agent, 'name', '-')} to={getattr(a, 'name', '-')}"
+-            ),
++            on_handoff=lambda ctx, input_data, a=a: _log_handoff(ctx, input_data, to_agent=a),
+         )
+         for a in handoffs
+     ]

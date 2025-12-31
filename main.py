@@ -3,7 +3,7 @@ import asyncio
 import dotenv
 
 from src.run import run
-from src.load_agent import load_main_agent, load_sub_agents
+from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 from src.logger import logger
 
 async def main():
@@ -17,10 +17,11 @@ async def main():
 
     # TODO: load schedule tasks
 
-    # load agents
+    # load agents and handoffs
     agent = load_main_agent()
-    agents_list = load_sub_agents(handoffs=[agent])
-    agent.handoffs = agents_list
+    agent_handoff_obj = create_handoff_obj(agent)
+    agents_list = load_sub_agents(handoffs=[agent_handoff_obj])
+    agent.handoffs = [create_handoff_obj(sub_agent) for sub_agent in agents_list]
 
     # Create a session
     # TODO: 保存session到文件中，以便下次接续会话

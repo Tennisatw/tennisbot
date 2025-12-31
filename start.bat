@@ -2,8 +2,8 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 set STOP_CODE=95
-set MAX_RESTARTS=20
-set WINDOW_SECONDS=60
+set MAX_RESTARTS=10
+set WINDOW_SECONDS=30
 
 set RESTART_COUNT=0
 set WINDOW_START=%TIME%

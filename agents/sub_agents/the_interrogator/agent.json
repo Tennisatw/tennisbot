@@ -8,5 +8,6 @@
         "apply_patch",
         "openai:WebSearchTool"
     ],
-    "temperature": 0.5
+    "temperature": 0.5,
+    "handoff_description": "to complete tasks related to understanding, analyzing, summarizing, and “interrogating” Tennisatw."
 }
