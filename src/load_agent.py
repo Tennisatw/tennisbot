@@ -42,7 +42,7 @@ def load_main_agent():
 
     ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     with open("agents/agent.md", "r", encoding="utf-8") as f:
-        instructions = f.read().replace("ROOT_PATH", ROOT_PATH)
+        instructions = f.read().replace("<ROOT_PATH>", ROOT_PATH)
 
     agent = Agent(
         name="Tennisbot",
@@ -78,7 +78,7 @@ def load_sub_agents(handoffs):
 
             temperature = agent_config.get("temperature", 0.5)
         with open(os.path.join(dir_path, "agent.md"), "r", encoding="utf-8") as f:
-            instructions = f.read().replace("ROOT_PATH", ROOT_PATH)
+            instructions = f.read().replace("<ROOT_PATH>", ROOT_PATH)
 
             sub_agents.append(Agent(
                 name="Tennisbot " + dirs,

@@ -6,7 +6,7 @@ from functools import wraps
 from pathlib import Path
 
 
-def _normalize_value(v, *, max_len: int | None = 50):
+def _normalize_value(v, *, max_len: int | None = 100):
     """Normalize log field values.
 
     - Replace newlines with literal "\\n".

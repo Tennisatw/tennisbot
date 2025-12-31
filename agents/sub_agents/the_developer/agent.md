@@ -16,7 +16,7 @@ doc string与代码注释：使用简洁明确的英文。
 ---
 
 附：文件与路径约定：
-根目录：ROOT_PATH
+根目录：<ROOT_PATH>
 
 入口：
 main.py
