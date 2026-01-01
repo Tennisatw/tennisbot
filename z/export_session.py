@@ -65,8 +65,8 @@ def export_session_messages(db_path: str, session_id: str, out_path: str, limit:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export tennisbot session messages from SQLite to JSON")
-    parser.add_argument("--db", default="data/session.db", help="SQLite db path")
-    parser.add_argument("--session-id", default="tennisbot", help="Session id")
+    parser.add_argument("--db", default="data/sessions/0.db", help="SQLite db path")
+    parser.add_argument("--session-id", default="0", help="Session id")
     parser.add_argument("--out", default="z/session_export.json", help="Output JSON path")
     parser.add_argument("--limit", type=int, default=None, help="Optional LIMIT")
     args = parser.parse_args()

@@ -1,4 +1,4 @@
-# 注：此工具会让Tennisbot产生极大的误解。误以为交接时要先归档，弄混归档和重启，等等。
+# 注：此工具会让Tennisbot产生极大的误解，包括 误以为交接时要先归档，弄混归档和重启，等等。
 # 因此暂时弃用此工具。
 
 from agents import function_tool

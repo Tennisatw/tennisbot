@@ -1,4 +1,3 @@
-import os
 import asyncio
 import dotenv
 
@@ -15,8 +14,6 @@ if __name__ == "__main__":
     logger.setup()
     logger.log("app.start")
 
-    # TODO: load settings
-
     # TODO: load schedule tasks
 
     # TODO: load GUI
@@ -30,8 +27,7 @@ if __name__ == "__main__":
             agent.handoffs = [create_handoff_obj(sub_agent) for sub_agent in agents_list]
 
             # Create a session
-            os.makedirs("data", exist_ok=True)
-            session = SQLiteSession("tennisbot", db_path="data/session.db")
+            session = SQLiteSession("0", db_path="data/sessions/0.db")
 
             # Start session
             asyncio.run(run_session(agent, session))

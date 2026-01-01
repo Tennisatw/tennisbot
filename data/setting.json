@@ -5,6 +5,7 @@
     "default_max_turns": 20,
 
     "default_ignore": [
+        ".env",
         ".git",
         "__pycache__",
         ".venv",
@@ -13,6 +14,7 @@
         "*.db-wal",
         "*.db-shm",
         ".pytest_cache",
+        "uv.lock",
         ".vscode",
         "z"
     ]}

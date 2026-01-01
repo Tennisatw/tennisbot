@@ -7,21 +7,15 @@ class Settings:
     def __init__(
         self,
         *,
-        name: str = "Tennisbot",
-        lang: str = "zh-CN",
-        default_max_turns: int = 20,
-        default_ignore: list[str] | None = None,
+        name: str,
+        lang: str,
+        default_max_turns: int,
+        default_ignore: list[str],
     ):
         self.name = name
         self.lang = lang
         self.default_max_turns = default_max_turns
-        self.default_ignore = default_ignore or [
-            ".git",
-            "__pycache__",
-            ".venv",
-            "logs",
-            "session.db",
-        ]
+        self.default_ignore = default_ignore
 
 
 def load_settings(path: str = "data/setting.json") -> Settings:
@@ -34,7 +28,7 @@ def load_settings(path: str = "data/setting.json") -> Settings:
         name=data.get("name", "Tennisbot"),
         lang=data.get("lang", "zh-CN"),
         default_max_turns=data.get("default_max_turns", 20),
-        default_ignore=data.get("default_ignore"),
+        default_ignore=data.get("default_ignore", []),
     )
 
 
