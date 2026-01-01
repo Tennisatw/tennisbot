@@ -13,18 +13,30 @@ async def draft_patch(
     allow_reject: bool = False,
     ) -> dict:
     """
-    Validate a unified diff patch str via `git apply --check --recount` and save it as draft.
-    Note: Don't include the index line in the patch.
-    Note: Patch hunks must include context lines.
+    Validate a git-style unified diff patch via `git apply --check --recount` and save it as draft.
+
+    Requirements:
+        - Use git-style unified diff format.
+        - Include file headers: `diff --git`, `--- a/...`, `+++ b/...`.
+        - Hunks must use a valid header like: `@@ -l,s +l,s @@`.
+        - Each hunk should include a few unchanged context lines (avoid 1-line-only hunks).
+        - Prefer one file + one contiguous change per patch for higher success rate.
+
+    Notes:
+        - Do not include the `index ...` line.
+        - Avoid malformed hunk headers (e.g. `@@?`), which will be rejected by git.
+
     Args:
         patch (str): Unified diff string.
         allow_reject (bool): Whether to add --reject when using git apply --check. Default is False.
+
     Returns:
         dict: {
             "success": bool,
             "path": str | None,       # saved path if success
             "error": None | str,      # error message if failed
         }
+
     Git-style unified patch example:
 ```
 diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/the_developer/template.txt

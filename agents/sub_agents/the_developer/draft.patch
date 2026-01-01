@@ -1,74 +1,47 @@
-diff --git a/src/run.py b/src/run.py
---- a/src/run.py
-+++ b/src/run.py
-@@ -1,75 +1,107 @@
- import os
- import sqlite3
- 
- from agents import Runner, SQLiteSession
- 
- from src.logger import logger
- from src.globals import SessionRolloverError
- from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
-@@
- def session_cleanup():
--    """Cleanup session database files."""
-+    """Cleanup session database content.
+diff --git a/src/tools/draft_patch.py b/src/tools/draft_patch.py
+--- a/src/tools/draft_patch.py
++++ b/src/tools/draft_patch.py
+@@ -12,28 +12,45 @@
+ async def draft_patch(
+     patch: str,
+     allow_reject: bool = False,
+     ) -> dict:
+     """
+-    Validate a unified diff patch str via `git apply --check --recount` and save it as draft.
+-    Note: Don't include the index line in the patch.
+-    Note: Patch hunks must include context lines.
++    Validate a git-style unified diff patch via `git apply --check --recount` and save it as draft.
++
++    Requirements:
++        - Use git-style unified diff format.
++        - Include file headers: `diff --git`, `--- a/...`, `+++ b/...`.
++        - Hunks must use a valid header like: `@@ -l,s +l,s @@`.
++        - Each hunk should include a few unchanged context lines (avoid 1-line-only hunks).
++        - Prefer one file + one contiguous change per patch for higher success rate.
 +
 +    Notes:
-+        - Keep the database file for stable paths and permissions.
-+        - Delete all user table rows and reset AUTOINCREMENT counters.
-+    """
-     db_path = "data/session.db"
-     wal_path = f"{db_path}-wal"
-     shm_path = f"{db_path}-shm"
-@@
-     if not os.path.exists(db_path):
-         logger.log("session.cleanup_skipped db_missing")
-         return
- 
--    conn = sqlite3.connect(db_path, timeout=0.2)
--    try:
--        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
--        conn.execute("VACUUM;")
--    finally:
--        conn.close()
-+    try:
-+        conn = sqlite3.connect(db_path, timeout=0.5)
-+        try:
-+            conn.execute("PRAGMA foreign_keys=OFF;")
++        - Do not include the `index ...` line.
++        - Avoid malformed hunk headers (e.g. `@@?`), which will be rejected by git.
 +
-+            tables = [
-+                r[0]
-+                for r in conn.execute(
-+                    "SELECT name FROM sqlite_master "
-+                    "WHERE type='table' AND name NOT LIKE 'sqlite_%';"
-+                ).fetchall()
-+            ]
-+            for t in tables:
-+                conn.execute(f"DELETE FROM {t};")
+     Args:
+         patch (str): Unified diff string.
+         allow_reject (bool): Whether to add --reject when using git apply --check. Default is False.
 +
-+            conn.execute("DELETE FROM sqlite_sequence;")
-+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
-+            conn.execute("VACUUM;")
-+        finally:
-+            conn.close()
-+    except Exception as e:
-+        logger.log(f"session.cleanup_db_op_failed error={type(e).__name__}")
- 
--    if os.path.exists(wal_path):
--        os.remove(wal_path)
--    if os.path.exists(shm_path):
--        os.remove(shm_path)
-+    for p in (wal_path, shm_path):
-+        try:
-+            if os.path.exists(p):
-+                os.remove(p)
-+        except Exception as e:
-+            logger.log(
-+                f"session.cleanup_sidecar_remove_failed file={p} error={type(e).__name__}"
-+            )
--
--    os.remove(db_path)
- 
-     logger.log("session.cleanup_completed")
+     Returns:
+         dict: {
+             "success": bool,
+             "path": str | None,       # saved path if success
+             "error": None | str,      # error message if failed
+         }
++
+     Git-style unified patch example:
+ ```
+ diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/the_developer/template.txt
+ --- a/agents/sub_agents/the_developer/template.txt
+ +++ b/agents/sub_agents/the_developer/template.txt
+ @@ -1,2 +1,3 @@
+  Hello Tennisbot
+  Love from Tennisatw
+ +Hello world
+ ```
+     """
