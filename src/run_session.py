@@ -1,5 +1,4 @@
 import os
-import sqlite3
 
 from agents import Runner, SQLiteSession
 
@@ -24,6 +23,7 @@ def _log_chat(role: str, content: str, *, agent_name: str | None = None) -> None
 
 def session_cleanup():
     """Cleanup session database files."""
+    # TODO：使用更优雅的方法清理，而不是直接删除。这样会有bug。
     # db_path = "data/session.db"
     # wal_path = f"{db_path}-wal"
     # shm_path = f"{db_path}-shm"
@@ -78,7 +78,7 @@ async def run_session():
             current_agent,
             user_input,
             session=session,
-            max_turns=30,
+            max_turns=20,
         )
 
         last_agent = getattr(result, "last_agent", None)

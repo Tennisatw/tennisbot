@@ -1,17 +1,36 @@
-diff --git a/src/tools/archive_and_new_session.py b/src/tools/archive_and_new_session.py
---- a/src/tools/archive_and_new_session.py
-+++ b/src/tools/archive_and_new_session.py
-@@ -1,11 +1,11 @@
- from agents import function_tool
- from src.logger import logged_tool
+diff --git a/src/run.py b/src/run.py
+--- a/src/run.py
++++ b/src/run.py
+@@ -1,6 +1,7 @@
+ import os
+ import sqlite3
++from typing import Any
+ 
+ from agents import Runner, SQLiteSession
+ 
+ from src.logger import logger
+ from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
+@@ -42,6 +43,11 @@
+ 
+     logger.log("session.cleanup_completed")
++
++
++class NewSessionRequested(Exception):
++    """Raised when the user requests to start a new session."""
+ 
+ async def run_session():
+     """Create agents and session, run the main chat loop."""
+@@ -87,6 +93,12 @@
+         name = getattr(current_agent, "name", "Agent")
+         print(f"{name}: {result.final_output}")
+         _log_chat("assistant", str(result.final_output), agent_name=name)
++
++        if (
++            isinstance(result.final_output, dict)
++            and result.final_output.get("action") == "archive_and_new_session"
++        ):
++            raise NewSessionRequested()
  
  
- @function_tool
- @logged_tool
--async def archive_and_new_session() -> None:
-+async def archive_and_new_session() -> dict:
-     """Rollover the current session.
-     i.e., archive the old session and start a new one.
-     """
--    raise SystemExit(94)
-+    return {"action": "archive_and_new_session"}
+         # End of session cleanup
+         # TODO: 新建agent总结会话，保存到data/session_summaries/yyyy-mm-dd_hh-mm-ss.md
