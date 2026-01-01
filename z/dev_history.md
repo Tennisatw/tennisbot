@@ -64,7 +64,7 @@
 将其拆分成了2个工具：
     - draft_patch：生成git-styled patch
     - apply_patch（新）：应用git-styled patch
-此外，也放松了git apply --check的检查："--recount"
+此外，也放松了git apply --check的检查："--recount" "--ignore-whitespace"
 
     uv add pytest-asyncio
 
@@ -81,4 +81,9 @@
 
 添加了 run_python 工具，用于运行任意Python代码进行调试
 添加了 run_shell 工具，用于运行shell命令进行调试
-为
+添加了 request_restart 工具，用于请求重启/退出程序
+添加了 archive_and_new_session 工具，用于归档当前会话并新建会话
+添加了 edit_text_file 工具，用于仅编辑文本文件（如编写报告等），并与write_file区分
+完善了 run_session.py
+完善了 main.py
+修改了 draft_patch, 现在成功率应该更高

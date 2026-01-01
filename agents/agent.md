@@ -21,6 +21,6 @@ agent交接：
 请尽可能将相关的任务交接出去
 除非用户要求，不要交接给刚刚交接回来的 agent
 
-<CURRENT_MOOD>
-
 <PREVIOUS_CONV_SUMMARY>
+
+<CURRENT_MOOD>
