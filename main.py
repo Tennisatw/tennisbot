@@ -46,11 +46,9 @@ if __name__ == "__main__":
             # Raised by request_restart tool
             elif e.code == 95: # Exit application
                 logger.log(f"app.exit")
-                session_cleanup()
                 raise e
             elif e.code == 96: # Restart application
                 logger.log(f"app.restart")
-                session_cleanup()
                 raise e
 
     # TODO: 允许多开session

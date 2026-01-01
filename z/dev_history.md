@@ -87,3 +87,9 @@
 完善了 run_session.py
 完善了 main.py
 修改了 draft_patch, 现在成功率应该更高
+
+<br>
+
+2026.01.01:
+
+完善了session_cleanup

@@ -5,10 +5,12 @@ from src.logger import logged_tool
 @function_tool
 @logged_tool
 async def request_restart(mode: str = "restart") -> None:
-    """Request the launcher to restart or exit the program.
+    """Request the launcher to restart or exit the app.
 
     This tool terminates the current process by raising ``SystemExit`` with a
     special exit code that is interpreted by the launcher (``start.bat``):
+
+    Note: restart/exit won't affect sessions. 
 
     Args:
         mode: Restart/exit selector.

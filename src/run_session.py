@@ -2,7 +2,7 @@ import os
 import sqlite3
 import time
 
-from agents import Runner, SQLiteSession
+from agents import Runner, SQLiteSession, MaxTurnsExceeded
 
 from src.logger import logger
 
@@ -57,19 +57,23 @@ async def run_session(agent, session: SQLiteSession):
 
         logger.log("chat role=user input=" + user_input.replace("\n", "\\n"))
 
-        result = await Runner.run(
-            current_agent,
-            user_input,
-            session=session,
-            max_turns=20,
-        )
+        try:
+            result = await Runner.run(
+                current_agent,
+                user_input,
+                session=session,
+                max_turns=20,
+            )
 
-        last_agent = getattr(result, "last_agent", None)
-        if last_agent is not None:
-            current_agent = last_agent
+            last_agent = getattr(result, "last_agent", None)
+            if last_agent is not None:
+                current_agent = last_agent
 
-        name = getattr(current_agent, "name", "Agent")
-        print(f"{name}: {result.final_output}")
-        logger.log("chat role=assistant name=" + name + " output=" + str(result.final_output).replace("\n", "\\n"))
+            name = getattr(current_agent, "name", "Agent")
+            print(f"{name}: {result.final_output}")
+            logger.log("chat role=assistant name=" + name + " output=" + str(result.final_output).replace("\n", "\\n"))
+            
+        except MaxTurnsExceeded:
+            logger.log("chat max_turns_exceeded")
 
         # TODO：每次会话20分钟后，自动保存会话，并创建新会话
