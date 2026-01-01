@@ -74,3 +74,11 @@
 新增了Tennisbot, the interrogator
 编写src/logger.py
 整理了handoff逻辑，并使用handoff函数自定义交接。
+
+<br>
+
+2025.12.31:
+
+添加了 run_python 工具，用于运行任意Python代码进行调试
+添加了 run_shell 工具，用于运行shell命令进行调试
+为

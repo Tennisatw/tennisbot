@@ -1,6 +1,7 @@
 from agents import SQLiteSession
 import asyncio
 import dotenv
+import os
 
 from src.run import run
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
@@ -25,7 +26,8 @@ async def main():
 
     # Create a session
     # TODO: 保存session到文件中，以便下次接续会话
-    session = SQLiteSession("tennisbot")
+    os.makedirs("data", exist_ok=True)
+    session = SQLiteSession("tennisbot", db_path="data/tennisbot_session.db")
     
     # start the event loop
     await run(agent, session)

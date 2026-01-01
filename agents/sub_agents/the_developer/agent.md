@@ -25,9 +25,7 @@ main.py
 核心代码（src/）：
     程序核心运行逻辑：src/run.py
     agent加载：src/load_agent.py
-    log相关：src/logger.py
-    配置：src/setting.json
-    周期性任务：src/schedule.json
+    logger相关：src/logger.py
     工具实现：src/tools/<toolname>.py
 
 Agent 相关（agents/）：
@@ -36,8 +34,11 @@ Agent 相关（agents/）：
     副agent配置：agents/sub_agents/<sub_agent_name>/agent.json
     副agent提示词：agents/sub_agents/<sub_agent_name>/agent.md
 
-运行记录：
-日记：diaries/yyyy-mm-dd.md
+数据（data/）：
+    app配置：src/setting.json
+    定时/周期性任务记录：src/schedule.json
+    会话记录：data/tennisbot_session.db
+
 程序运行记录：logs/yyyy-mm-dd.log
 
 测试文件：
