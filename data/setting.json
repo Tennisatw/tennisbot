@@ -2,9 +2,17 @@
     "name": "Tennisbot",
     "lang": "zh-CN",
 
-    "default_model": "gpt-5-mini",
-    "default_temperature": 0.5,
-    "default_max_tokens": 2048,
     "default_max_turns": 20,
 
-    "default_ignore": [".git", "__pycache__", ".venv", "logs", "session.db"]}
+    "default_ignore": [
+        ".git",
+        "__pycache__",
+        ".venv",
+        "logs",
+        "*.db",
+        "*.db-wal",
+        "*.db-shm",
+        ".pytest_cache",
+        ".vscode",
+        "z"
+    ]}

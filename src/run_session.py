@@ -47,12 +47,12 @@ async def run_session(agent, session: SQLiteSession):
 
     current_agent = agent
 
-    # chat loop, breaks when session ends
+    # chat loop, breaks when requied archive session, restart and exit, or error occurs
     while True:
 
         user_input = input("User: ")
 
-        # Hotkey for archive and start a new session
+        # Hotkey for archive a session
         if user_input == "=":
             raise SystemExit(94)
 

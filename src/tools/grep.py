@@ -3,6 +3,7 @@ import fnmatch
 
 from agents import function_tool
 from src.logger import logged_tool
+from src.settings import settings
 
 
 @function_tool
@@ -20,7 +21,7 @@ async def grep(
         query (str): Literal substring to find. Empty query returns no matches.
         root (str): Root directory to search from. Default "." (current working directory).
         ignore (list[str] | None): Glob-style ignore patterns applied to both base names and POSIX-relative paths.
-            default is [".git", "__pycache__", ".venv", "logs", "session.db"].
+            If None, uses default ignore patterns from settings.
             Ignored directories/files are skipped recursively.
         max_matches (int): Maximum number of total matches to return. Default 5000.
         case_sensitive (bool): Whether the search is case-sensitive. Default False.
@@ -50,7 +51,7 @@ async def grep(
 
     # Defaults for ignore patterns
     if ignore is None:
-        ignore = [".git", "__pycache__", ".venv", "logs", "session.db"]
+        ignore = settings.default_ignore
 
     # Normalize ignore patterns (strip trailing slashes/backslashes)
     norm_pats = [p.rstrip('/').rstrip('\\') for p in ignore]

@@ -3,6 +3,7 @@ import fnmatch
 
 from agents import function_tool
 from src.logger import logged_tool
+from src.settings import settings
 
 
 @function_tool
@@ -16,7 +17,7 @@ async def list_files(
     Args:
         root (str): Root directory.
         ignore (list[str] | None): Glob-style ignore patterns.
-            default is [".git", "__pycache__", ".venv", "logs", "session.db"].
+            If None, uses default ignore patterns from settings.
 
     Returns:
         dict: Nested tree describing the filesystem:
@@ -31,7 +32,7 @@ async def list_files(
 
     # defaults
     if ignore is None:
-        ignore = [".git", "__pycache__", ".venv", "logs", "session.db"]
+        ignore = settings.default_ignore
 
     # normalize patterns
     norm_pats = [p.rstrip('/').rstrip('\\') for p in ignore]

@@ -90,6 +90,8 @@ def load_sub_agents(handoffs):
         dir_path = os.path.join("agents/sub_agents", dirs)
         if not os.path.isdir(dir_path):
             continue
+        if dirs.startswith('_'):
+            continue
 
         agent_file = os.path.join(dir_path, "agent.json")
         if not os.path.exists(agent_file):
