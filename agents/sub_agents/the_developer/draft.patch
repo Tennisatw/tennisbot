@@ -1,47 +1,147 @@
-diff --git a/src/tools/draft_patch.py b/src/tools/draft_patch.py
---- a/src/tools/draft_patch.py
-+++ b/src/tools/draft_patch.py
-@@ -12,28 +12,45 @@
- async def draft_patch(
-     patch: str,
-     allow_reject: bool = False,
-     ) -> dict:
-     """
--    Validate a unified diff patch str via `git apply --check --recount` and save it as draft.
--    Note: Don't include the index line in the patch.
--    Note: Patch hunks must include context lines.
-+    Validate a git-style unified diff patch via `git apply --check --recount` and save it as draft.
+diff --git a/main.py b/main.py
+--- a/main.py
++++ b/main.py
+@@ -1,38 +1,109 @@
+ import asyncio
++import sys
++import threading
++import traceback
+ import dotenv
+ 
+ from src.run import run_session, session_cleanup
+ from src.logger import logger
+ 
 +
-+    Requirements:
-+        - Use git-style unified diff format.
-+        - Include file headers: `diff --git`, `--- a/...`, `+++ b/...`.
-+        - Hunks must use a valid header like: `@@ -l,s +l,s @@`.
-+        - Each hunk should include a few unchanged context lines (avoid 1-line-only hunks).
-+        - Prefer one file + one contiguous change per patch for higher success rate.
++def install_global_exception_hooks() -> None:
++    """Install global exception hooks.
 +
 +    Notes:
-+        - Do not include the `index ...` line.
-+        - Avoid malformed hunk headers (e.g. `@@?`), which will be rejected by git.
++        - sys.excepthook: catches uncaught exceptions in main thread.
++        - threading.excepthook: catches uncaught exceptions in non-main threads.
++        - asyncio loop exception handler: catches unhandled task exceptions.
++    """
 +
-     Args:
-         patch (str): Unified diff string.
-         allow_reject (bool): Whether to add --reject when using git apply --check. Default is False.
++    def _format_exc(exc: BaseException) -> str:
++        return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
 +
-     Returns:
-         dict: {
-             "success": bool,
-             "path": str | None,       # saved path if success
-             "error": None | str,      # error message if failed
-         }
++    def _sys_excepthook(exc_type, exc, tb):
++        if isinstance(exc, SystemExit):
++            logger.log(f"global.sys_excepthook system_exit code={exc.code}")
++            raise exc
++        if isinstance(exc, KeyboardInterrupt):
++            logger.log("global.sys_excepthook keyboard_interrupt")
++            raise exc
 +
-     Git-style unified patch example:
- ```
- diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/the_developer/template.txt
- --- a/agents/sub_agents/the_developer/template.txt
- +++ b/agents/sub_agents/the_developer/template.txt
- @@ -1,2 +1,3 @@
-  Hello Tennisbot
-  Love from Tennisatw
- +Hello world
- ```
-     """
++        logger.log(f"global.sys_excepthook uncaught type={getattr(exc_type, '__name__', str(exc_type))}")
++        logger.log(_format_exc(exc))
++
++    sys.excepthook = _sys_excepthook
++
++    def _threading_excepthook(args: threading.ExceptHookArgs):
++        exc = args.exc_value
++        if isinstance(exc, SystemExit):
++            logger.log(
++                f"global.threading_excepthook system_exit code={exc.code} thread={args.thread.name}"
++            )
++            return
++        if isinstance(exc, KeyboardInterrupt):
++            logger.log(f"global.threading_excepthook keyboard_interrupt thread={args.thread.name}")
++            return
++
++        logger.log(
++            "global.threading_excepthook uncaught "
++            f"thread={args.thread.name} type={type(exc).__name__}"
++        )
++        logger.log(_format_exc(exc))
++
++    threading.excepthook = _threading_excepthook
++
++    def _asyncio_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
++        exc = context.get("exception")
++        msg = context.get("message")
++        where = context.get("future") or context.get("task") or context.get("handle")
++
++        if exc is None:
++            logger.log(f"global.asyncio_exception_handler message={msg} where={where}")
++            return
++
++        if isinstance(exc, SystemExit):
++            logger.log(f"global.asyncio_exception_handler system_exit code={exc.code} where={where}")
++            return
++        if isinstance(exc, KeyboardInterrupt):
++            logger.log(f"global.asyncio_exception_handler keyboard_interrupt where={where}")
++            return
++
++        logger.log(
++            "global.asyncio_exception_handler uncaught "
++            f"type={type(exc).__name__} message={msg} where={where}"
++        )
++        logger.log(_format_exc(exc))
++
++    old_run = asyncio.run
++
++    def _run_with_handler(main, *, debug=False):
++        loop = asyncio.new_event_loop()
++        try:
++            asyncio.set_event_loop(loop)
++            loop.set_debug(debug)
++            loop.set_exception_handler(_asyncio_exception_handler)
++            return loop.run_until_complete(main)
++        finally:
++            try:
++                _cancel_all_tasks(loop)
++                loop.run_until_complete(loop.shutdown_asyncgens())
++                loop.run_until_complete(loop.shutdown_default_executor())
++            finally:
++                asyncio.set_event_loop(None)
++                loop.close()
++
++    def _cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
++        tasks = asyncio.all_tasks(loop)
++        for t in tasks:
++            t.cancel()
++        if tasks:
++            loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
++
++    asyncio.run = _run_with_handler
++
+ 
+ if __name__ == "__main__":
+ 
+     dotenv.load_dotenv()
+ 
+     logger.setup()
+     logger.log("app.start")
++
++    install_global_exception_hooks()
+ 
+     # TODO: load settings
+ 
+     # TODO: load schedule tasks
+ 
+     try:
+         # Start session
+         asyncio.run(run_session())
+ 
+     except SystemExit as e:
+ 
+         # Raised by archive_and_new_session tool
+         if e.code == 94:
+             # Start a new session
+             logger.log("session.archive_and_new_session_requested")
+             session_cleanup()
+             asyncio.run(run_session())
+ 
+         # Raised by request_restart tool
+         elif e.code == 95:
+             logger.log(f"system.exit_requested with code={e.code}")
+             session_cleanup()
+             raise e
+         elif e.code == 96:
+             logger.log(f"system.restart_requested with code={e.code}")
+             session_cleanup()
+             raise e
++        else:
++            logger.log(f"system.exit_requested with code={e.code}")
++            session_cleanup()
++            raise e

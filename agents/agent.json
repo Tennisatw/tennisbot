@@ -5,7 +5,7 @@
         "read_file",
         "edit_text_file",
         "grep",
-        "rollover_session",
+        "archive_and_new_session",
         "request_restart",
         "openai:WebSearchTool"
     ],
