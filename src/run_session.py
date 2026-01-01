@@ -10,7 +10,7 @@ from src.settings import settings
 
 def session_cleanup():
     """Cleanup session database files."""
-    db_path = "data/session.db"
+    db_path = "data/sessions/0.db"
     if not os.path.exists(db_path):
         logger.log("session.cleanup_skipped db_missing")
         return
