@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 
 from agents import Runner, SQLiteSession
 
@@ -31,13 +32,13 @@ def session_cleanup():
     finally:
         conn.close()
 
-    # VACUUM cannot run inside a transaction. Ensure the connection is closed
-    # (and any implicit transaction is ended) before compacting.
-    conn = sqlite3.connect(db_path, timeout=0.2, isolation_level=None)
+    time.sleep(0.1) # otherwise: "cannot VACUUM from within a transaction"
+
+    conn2 = sqlite3.connect(db_path, timeout=0.2)
     try:
-        conn.execute("VACUUM;")
+        conn2.execute("VACUUM;")
     finally:
-        conn.close()
+        conn2.close()
 
     logger.log("session.cleanup_completed")
 
