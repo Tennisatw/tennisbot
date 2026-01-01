@@ -13,7 +13,7 @@ async def draft_patch(
     allow_reject: bool = False,
     ) -> dict:
     """
-    Validate a git-style unified diff patch via `git apply --check --recount` and save it as draft.
+    Validate a git-style unified diff patch via `git apply --check --recount --verbose --ignore-whitespace` and save it as draft.
 
     Requirements:
         - Use git-style unified diff format.
@@ -66,7 +66,7 @@ diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/th
     draft_path.parent.mkdir(parents=True, exist_ok=True)
     draft_path.write_text(patch, encoding="utf-8")
 
-    cmd = [git_path, "apply", "--check", "--recount", f"-p{path_strip}"]
+    cmd = [git_path, "apply", "--check", "--verbose", "--recount", "--ignore-whitespace", f"-p{path_strip}"]
     if allow_reject:
         cmd.append("--reject")
     cmd.append(str(draft_path))

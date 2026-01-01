@@ -14,7 +14,7 @@ async def apply_patch(
     allow_reject: bool = False,
     ) -> dict:
     """
-    Apply a unified diff patch file via `git apply --recount`
+    Apply a unified diff patch file via `git apply --recount --ignore-whitespace`
     Note: Please check with the user before applying any patches.
     Args:
         patch_path (str): Patch file path, default is "agents/sub_agents/the_developer/draft.patch".
@@ -53,7 +53,7 @@ async def apply_patch(
     if tool == "git apply":
         git_path = shutil.which("git")
         if git_path:
-            check_cmd = [git_path, "apply", "--check", "--recount", f"-p{path_strip}"]
+            check_cmd = [git_path, "apply", "--check", "--recount", "--ignore-whitespace", f"-p{path_strip}"]
             if allow_reject:
                 check_cmd.append("--reject")
             check_cmd.append(str(patch_file))
@@ -66,7 +66,7 @@ async def apply_patch(
                 timeout=60,
             )
             if check_proc.returncode == 0:
-                apply_cmd = [git_path, "apply", "--recount", f"-p{path_strip}"]
+                apply_cmd = [git_path, "apply", "--recount", "--ignore-whitespace", f"-p{path_strip}"]
                 if allow_reject:
                     apply_cmd.append("--reject")
                 apply_cmd.append(str(patch_file))

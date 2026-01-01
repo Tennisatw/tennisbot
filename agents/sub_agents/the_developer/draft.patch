@@ -1,147 +1,17 @@
-diff --git a/main.py b/main.py
---- a/main.py
-+++ b/main.py
-@@ -1,38 +1,109 @@
- import asyncio
-+import sys
-+import threading
-+import traceback
- import dotenv
+diff --git a/src/tools/archive_and_new_session.py b/src/tools/archive_and_new_session.py
+--- a/src/tools/archive_and_new_session.py
++++ b/src/tools/archive_and_new_session.py
+@@ -1,11 +1,11 @@
+ from agents import function_tool
+ from src.logger import logged_tool
  
- from src.run import run_session, session_cleanup
- from src.logger import logger
  
-+
-+def install_global_exception_hooks() -> None:
-+    """Install global exception hooks.
-+
-+    Notes:
-+        - sys.excepthook: catches uncaught exceptions in main thread.
-+        - threading.excepthook: catches uncaught exceptions in non-main threads.
-+        - asyncio loop exception handler: catches unhandled task exceptions.
-+    """
-+
-+    def _format_exc(exc: BaseException) -> str:
-+        return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-+
-+    def _sys_excepthook(exc_type, exc, tb):
-+        if isinstance(exc, SystemExit):
-+            logger.log(f"global.sys_excepthook system_exit code={exc.code}")
-+            raise exc
-+        if isinstance(exc, KeyboardInterrupt):
-+            logger.log("global.sys_excepthook keyboard_interrupt")
-+            raise exc
-+
-+        logger.log(f"global.sys_excepthook uncaught type={getattr(exc_type, '__name__', str(exc_type))}")
-+        logger.log(_format_exc(exc))
-+
-+    sys.excepthook = _sys_excepthook
-+
-+    def _threading_excepthook(args: threading.ExceptHookArgs):
-+        exc = args.exc_value
-+        if isinstance(exc, SystemExit):
-+            logger.log(
-+                f"global.threading_excepthook system_exit code={exc.code} thread={args.thread.name}"
-+            )
-+            return
-+        if isinstance(exc, KeyboardInterrupt):
-+            logger.log(f"global.threading_excepthook keyboard_interrupt thread={args.thread.name}")
-+            return
-+
-+        logger.log(
-+            "global.threading_excepthook uncaught "
-+            f"thread={args.thread.name} type={type(exc).__name__}"
-+        )
-+        logger.log(_format_exc(exc))
-+
-+    threading.excepthook = _threading_excepthook
-+
-+    def _asyncio_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
-+        exc = context.get("exception")
-+        msg = context.get("message")
-+        where = context.get("future") or context.get("task") or context.get("handle")
-+
-+        if exc is None:
-+            logger.log(f"global.asyncio_exception_handler message={msg} where={where}")
-+            return
-+
-+        if isinstance(exc, SystemExit):
-+            logger.log(f"global.asyncio_exception_handler system_exit code={exc.code} where={where}")
-+            return
-+        if isinstance(exc, KeyboardInterrupt):
-+            logger.log(f"global.asyncio_exception_handler keyboard_interrupt where={where}")
-+            return
-+
-+        logger.log(
-+            "global.asyncio_exception_handler uncaught "
-+            f"type={type(exc).__name__} message={msg} where={where}"
-+        )
-+        logger.log(_format_exc(exc))
-+
-+    old_run = asyncio.run
-+
-+    def _run_with_handler(main, *, debug=False):
-+        loop = asyncio.new_event_loop()
-+        try:
-+            asyncio.set_event_loop(loop)
-+            loop.set_debug(debug)
-+            loop.set_exception_handler(_asyncio_exception_handler)
-+            return loop.run_until_complete(main)
-+        finally:
-+            try:
-+                _cancel_all_tasks(loop)
-+                loop.run_until_complete(loop.shutdown_asyncgens())
-+                loop.run_until_complete(loop.shutdown_default_executor())
-+            finally:
-+                asyncio.set_event_loop(None)
-+                loop.close()
-+
-+    def _cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
-+        tasks = asyncio.all_tasks(loop)
-+        for t in tasks:
-+            t.cancel()
-+        if tasks:
-+            loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
-+
-+    asyncio.run = _run_with_handler
-+
- 
- if __name__ == "__main__":
- 
-     dotenv.load_dotenv()
- 
-     logger.setup()
-     logger.log("app.start")
-+
-+    install_global_exception_hooks()
- 
-     # TODO: load settings
- 
-     # TODO: load schedule tasks
- 
-     try:
-         # Start session
-         asyncio.run(run_session())
- 
-     except SystemExit as e:
- 
-         # Raised by archive_and_new_session tool
-         if e.code == 94:
-             # Start a new session
-             logger.log("session.archive_and_new_session_requested")
-             session_cleanup()
-             asyncio.run(run_session())
- 
-         # Raised by request_restart tool
-         elif e.code == 95:
-             logger.log(f"system.exit_requested with code={e.code}")
-             session_cleanup()
-             raise e
-         elif e.code == 96:
-             logger.log(f"system.restart_requested with code={e.code}")
-             session_cleanup()
-             raise e
-+        else:
-+            logger.log(f"system.exit_requested with code={e.code}")
-+            session_cleanup()
-+            raise e
+ @function_tool
+ @logged_tool
+-async def archive_and_new_session() -> None:
++async def archive_and_new_session() -> dict:
+     """Rollover the current session.
+     i.e., archive the old session and start a new one.
+     """
+-    raise SystemExit(94)
++    return {"action": "archive_and_new_session"}
