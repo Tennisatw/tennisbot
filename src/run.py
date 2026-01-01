@@ -1,4 +1,5 @@
 import os
+import sqlite3
 
 from agents import Runner, SQLiteSession
 
@@ -24,17 +25,28 @@ def _log_chat(role: str, content: str, *, agent_name: str | None = None) -> None
 
 def session_cleanup():
     """Cleanup session database files."""
-    # TODO: 尝试用更优雅的方法清理SQLite数据库文件
-    db_paths = [
-        "data/session.db",
-        "data/session.db-wal",
-        "data/session.db-shm",
-    ]
+    db_path = "data/session.db"
+    wal_path = f"{db_path}-wal"
+    shm_path = f"{db_path}-shm"
 
-    for p in db_paths:
-        if os.path.exists(p):
-            os.remove(p)
-    
+    if not os.path.exists(db_path):
+        logger.log("session.cleanup_skipped db_missing")
+        return
+
+    conn = sqlite3.connect(db_path, timeout=0.2)
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        conn.execute("VACUUM;")
+    finally:
+        conn.close()
+
+    if os.path.exists(wal_path):
+        os.remove(wal_path)
+    if os.path.exists(shm_path):
+        os.remove(shm_path)
+
+    os.remove(db_path)
+
     logger.log("session.cleanup_completed")
 
 async def run():
