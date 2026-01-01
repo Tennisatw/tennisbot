@@ -82,7 +82,7 @@
 添加了 run_python 工具，用于运行任意Python代码进行调试
 添加了 run_shell 工具，用于运行shell命令进行调试
 添加了 request_restart 工具，用于请求重启/退出程序
-添加了 archive_and_new_session 工具，用于归档当前会话并新建会话
+添加了 archive_session 工具，用于归档当前会话并新建会话
 添加了 edit_text_file 工具，用于仅编辑文本文件（如编写报告等），并与write_file区分
 完善了 run_session.py
 完善了 main.py

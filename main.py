@@ -1,6 +1,9 @@
+import os
 import asyncio
 import dotenv
 
+from agents import SQLiteSession
+from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 from src.run_session import run_session, session_cleanup
 from src.logger import logger
 
@@ -16,14 +19,26 @@ if __name__ == "__main__":
 
     # TODO: load schedule tasks
 
+    # TODO: load GUI
+
     while True:
         try:
+            # load agents and handoffs
+            agent = load_main_agent()
+            agent_handoff_obj = create_handoff_obj(agent)
+            agents_list = load_sub_agents(handoffs=[agent_handoff_obj])
+            agent.handoffs = [create_handoff_obj(sub_agent) for sub_agent in agents_list]
+
+            # Create a session
+            os.makedirs("data", exist_ok=True)
+            session = SQLiteSession("tennisbot", db_path="data/session.db")
+
             # Start session
-            asyncio.run(run_session())
+            asyncio.run(run_session(agent, session))
 
         except SystemExit as e:
 
-            # Raised by archive_and_new_session tool
+            # Raised by archive_session tool
             if e.code == 94: # Start a new session
                 logger.log("app.start_new_session")
                 session_cleanup()
@@ -37,3 +52,5 @@ if __name__ == "__main__":
                 logger.log(f"app.restart")
                 session_cleanup()
                 raise e
+
+    # TODO: 允许多开session

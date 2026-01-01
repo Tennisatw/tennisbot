@@ -5,7 +5,6 @@ import time
 from agents import Runner, SQLiteSession
 
 from src.logger import logger
-from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 
 
 def session_cleanup():
@@ -42,18 +41,8 @@ def session_cleanup():
 
     logger.log("session.cleanup_completed")
 
-async def run_session():
+async def run_session(agent, session: SQLiteSession):
     """Create agents and session, run the main chat loop."""
-
-    # load agents and handoffs
-    agent = load_main_agent()
-    agent_handoff_obj = create_handoff_obj(agent)
-    agents_list = load_sub_agents(handoffs=[agent_handoff_obj])
-    agent.handoffs = [create_handoff_obj(sub_agent) for sub_agent in agents_list]
-
-    # Create a session
-    os.makedirs("data", exist_ok=True)
-    session = SQLiteSession("tennisbot", db_path="data/session.db")
 
     current_agent = agent
 
@@ -66,7 +55,7 @@ async def run_session():
         if user_input == "=":
             raise SystemExit(94)
 
-        logger.log("role=user input=" + user_input.replace("\n", "\\n"))
+        logger.log("chat role=user input=" + user_input.replace("\n", "\\n"))
 
         result = await Runner.run(
             current_agent,
@@ -81,7 +70,6 @@ async def run_session():
 
         name = getattr(current_agent, "name", "Agent")
         print(f"{name}: {result.final_output}")
-        logger.log("role=assistant name=" + name + " output=" + str(result.final_output).replace("\n", "\\n"))
+        logger.log("chat role=assistant name=" + name + " output=" + str(result.final_output).replace("\n", "\\n"))
 
         # TODO：每次会话20分钟后，自动保存会话，并创建新会话
-        # TODO: 异步会话，允许同时处理多个用户请求
