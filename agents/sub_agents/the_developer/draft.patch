@@ -1,23 +1,93 @@
-diff --git a/src/load_agent.py b/src/load_agent.py
---- a/src/load_agent.py
-+++ b/src/load_agent.py
-@@ -44,14 +44,14 @@
-             tool = getattr(agent_module, short_name, None)
-             if tool:
-                 # inst = LoggedOpenaiTool(tool())
-                 tools.append(tool())
-             else:
--                print(f"Warning: Tool {tool_name} not found in agents module.")
-+                logger.log(f"warn.tool_not_found_in_agents_module tool={tool_name}")
-         else:
-             # "read_files"
-             tool = globals().get(tool_name, None)
-             if tool:
-                 tools.append(tool)
-             else:
--                print(f"Warning: Tool {tool_name} not found in src.tools.")
-+                logger.log(f"warn.tool_not_found_in_src_tools tool={tool_name}")
-     return tools
- 
- def load_main_agent():
-     # Load main agent from agents/agent.md
+diff --git a/z/z.py b/z/z.py
+--- a/z/z.py
++++ b/z/z.py
+@@ -1,3 +1,93 @@
+-from agents import WebSearchTool
+-
+-tool_obj = WebSearchTool()
++"""Export session.db messages to JSON.
++
++Usage (PowerShell):
++    python z/z.py
++    python z/z.py --session-id tennisbot --out z/session_export.json
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import sqlite3
++from pathlib import Path
++
++
++def export_session_messages(db_path: str, session_id: str, out_path: str, limit: int | None = None) -> dict:
++    """Export messages for a session_id into a JSON file."""
++
++    con = sqlite3.connect(db_path)
++    cur = con.cursor()
++
++    sql = (
++        "SELECT id, session_id, created_at, message_data "
++        "FROM agent_messages "
++        "WHERE session_id = ? "
++        "ORDER BY created_at ASC, id ASC"
++    )
++    if limit is not None:
++        sql += " LIMIT ?"
++        cur.execute(sql, (session_id, limit))
++    else:
++        cur.execute(sql, (session_id,))
++
++    rows = cur.fetchall()
++    con.close()
++
++    messages: list[dict] = []
++    bad_json = 0
++    for mid, sid, created_at, message_data in rows:
++        item = {
++            "id": mid,
++            "session_id": sid,
++            "created_at": created_at,
++            "message_data_raw": message_data,
++        }
++        try:
++            item["message_data"] = json.loads(message_data)
++        except Exception:
++            bad_json += 1
++            item["message_data"] = None
++        messages.append(item)
++
++    payload = {
++        "db_path": db_path,
++        "session_id": session_id,
++        "count": len(messages),
++        "bad_json": bad_json,
++        "messages": messages,
++    }
++
++    out = Path(out_path)
++    out.parent.mkdir(parents=True, exist_ok=True)
++    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
++
++    return {
++        "ok": True,
++        "out_path": str(out),
++        "count": len(messages),
++        "bad_json": bad_json,
++    }
++
++
++def main() -> None:
++    parser = argparse.ArgumentParser(description="Export tennisbot session messages from SQLite to JSON")
++    parser.add_argument("--db", default="data/session.db", help="SQLite db path")
++    parser.add_argument("--session-id", default="tennisbot", help="Session id")
++    parser.add_argument("--out", default="z/session_export.json", help="Output JSON path")
++    parser.add_argument("--limit", type=int, default=None, help="Optional LIMIT")
++    args = parser.parse_args()
++
++    res = export_session_messages(args.db, args.session_id, args.out, args.limit)
++    print(json.dumps(res, ensure_ascii=False, indent=2))
++
++
++if __name__ == "__main__":
++    main()

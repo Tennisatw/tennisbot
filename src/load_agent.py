@@ -44,14 +44,14 @@ def load_agent_tools(tool_names):
                 # inst = LoggedOpenaiTool(tool())
                 tools.append(tool())
             else:
-                print(f"Warning: Tool {tool_name} not found in agents module.")
+                logger.log(f"Warning! tool_not_found_in_agents_module tool={tool_name}")
         else:
             # "read_files"
             tool = globals().get(tool_name, None)
             if tool:
                 tools.append(tool)
             else:
-                print(f"Warning: Tool {tool_name} not found in src.tools.")
+                logger.log(f"Warning! tool_not_found_in_src_tools tool={tool_name}")
     return tools
 
 def load_main_agent():

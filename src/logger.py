@@ -77,7 +77,7 @@ class Logger:
         today = datetime.now().strftime("%Y-%m-%d")
         log_path = log_dir / f"{today}.log"
 
-        fmt = "%(asctime)s | %(levelname)s | %(message)s "
+        fmt = "%(asctime)s | %(message)s "
         formatter = logging.Formatter(fmt)
 
         logger = logging.getLogger(self.name)

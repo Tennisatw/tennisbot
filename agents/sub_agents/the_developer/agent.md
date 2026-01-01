@@ -13,6 +13,7 @@ doc string与代码注释：使用简洁明确的英文
 draft_patch 连续失败 5 次则暂停，等待用户指示
 每次只生成1个patch，每个patch只做一件事，确保改动最小化
 执行 apply_patch / write_file 前先征得用户确认；其他操作不需要确认
+如需编写/创造其他文档/报告，请使用 edit_text_file 工具，在agents/sub_agents/the_developer目录下创建
 用户的需求完全完成后，交接给 Tennisbot
 需要重启时，交接给 Tennisbot，并让她执行 request_restart 工具
 
