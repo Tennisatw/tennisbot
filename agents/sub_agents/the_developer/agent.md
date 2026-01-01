@@ -26,9 +26,9 @@ draft_patch 连续失败 5 次则暂停，等待用户指示
 main.py
 
 核心代码（src/）：
-    程序核心运行逻辑：src/run.py
     agent加载：src/load_agent.py
     logger相关：src/logger.py
+    运行会话相关：src/run_session.py
     工具实现：src/tools/<toolname>.py
 
 Agent 相关（agents/）：

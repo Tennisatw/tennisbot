@@ -1,7 +1,7 @@
 import asyncio
 import dotenv
 
-from run_session import run_session, session_cleanup
+from src.run_session import run_session, session_cleanup
 from src.logger import logger
 
 
@@ -24,17 +24,16 @@ if __name__ == "__main__":
         except SystemExit as e:
 
             # Raised by archive_and_new_session tool
-            if e.code == 94:
-                # Start a new session
-                logger.log("session.archive_and_new_session_requested")
+            if e.code == 94: # Start a new session
+                logger.log("app.start_new_session")
                 session_cleanup()
 
             # Raised by request_restart tool
-            elif e.code == 95:
-                logger.log(f"system.exit_requested with code={e.code}")
+            elif e.code == 95: # Exit application
+                logger.log(f"app.exit")
                 session_cleanup()
                 raise e
-            elif e.code == 96:
-                logger.log(f"system.restart_requested with code={e.code}")
+            elif e.code == 96: # Restart application
+                logger.log(f"app.restart")
                 session_cleanup()
                 raise e

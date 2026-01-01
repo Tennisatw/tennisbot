@@ -6,21 +6,6 @@ from src.logger import logger
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 
 
-def _log_chat(role: str, content: str, *, agent_name: str | None = None) -> None:
-    """Log full chat content.
-
-    Notes:
-        - Keep content untruncated for complete transcripts.
-        - Replace newlines to keep one log line per event.
-    """
-
-    content = content.replace("\r\n", "\\n").replace("\n", "\\n")
-    if agent_name:
-        logger.log(f"chat role={role} agent={agent_name} content={content}")
-    else:
-        logger.log(f"chat role={role} content={content}")
-
-
 def session_cleanup():
     """Cleanup session database files."""
     # TODO：使用更优雅的方法清理，而不是直接删除。这样会有bug。
@@ -72,7 +57,7 @@ async def run_session():
         if user_input == "=":
             raise SystemExit(94)
 
-        _log_chat("user", user_input)
+        logger.log("role=user input=" + user_input.replace("\n", "\\n"))
 
         result = await Runner.run(
             current_agent,
@@ -87,11 +72,7 @@ async def run_session():
 
         name = getattr(current_agent, "name", "Agent")
         print(f"{name}: {result.final_output}")
-        _log_chat("assistant", str(result.final_output), agent_name=name)
-
-
-        # End of session cleanup
-        # TODO: 新建agent总结会话，保存到data/session_summaries/yyyy-mm-dd_hh-mm-ss.md
+        logger.log("role=assistant name=" + name + " output=" + str(result.final_output).replace("\n", "\\n"))
 
         # TODO：每次会话20分钟后，自动保存会话，并创建新会话
         # TODO: 异步会话，允许同时处理多个用户请求
