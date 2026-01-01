@@ -1,6 +1,82 @@
-diff --git a/tests/_tmp_patch_tool/e638da481e7f41129fee9ca04aba4325.txt b/tests/_tmp_patch_tool/e638da481e7f41129fee9ca04aba4325.txt
-deleted file mode 100644
---- a/tests/_tmp_patch_tool/e638da481e7f41129fee9ca04aba4325.txt
-+++ /dev/null
-@@ -1,1 +0,0 @@
--hello patch tool
+diff --git a/src/run_session.py b/src/run_session.py
+--- a/src/run_session.py
++++ b/src/run_session.py
+@@ -1,9 +1,10 @@
+ import os
+ import sqlite3
+ import time
+ 
+ from agents import Runner, SQLiteSession, MaxTurnsExceeded
+ 
+ from src.logger import logger
++from src.settings import settings
+ 
+ 
+ def session_cleanup():
+     """Cleanup session database files."""
+@@ -62,7 +63,7 @@
+                 current_agent,
+                 user_input,
+                 session=session,
+-                max_turns=20,
++                max_turns=settings.default_max_turns,
+             )
+ 
+             last_agent = getattr(result, "last_agent", None)
+             if last_agent is not None:
+                 current_agent = last_agent
+diff --git a/src/settings.py b/src/settings.py
+new file mode 100644
+--- /dev/null
++++ b/src/settings.py
+@@ -0,0 +1,62 @@
++import json
++
++
++class Settings:
++    """Global app settings loaded from data/setting.json."""
++
++    def __init__(
++        self,
++        *,
++        name: str = "Tennisbot",
++        lang: str = "zh-CN",
++        default_model: str = "gpt-5-mini",
++        default_temperature: float = 0.5,
++        default_max_tokens: int = 2048,
++        default_max_turns: int = 20,
++        default_ignore: list[str] | None = None,
++    ):
++        self.name = name
++        self.lang = lang
++        self.default_model = default_model
++        self.default_temperature = default_temperature
++        self.default_max_tokens = default_max_tokens
++        self.default_max_turns = default_max_turns
++        self.default_ignore = default_ignore or [
++            ".git",
++            "__pycache__",
++            ".venv",
++            "logs",
++            "session.db",
++        ]
++
++
++def load_settings(path: str = "data/setting.json") -> Settings:
++    """Load settings from json file."""
++
++    with open(path, "r", encoding="utf-8") as f:
++        data = json.load(f)
++
++    return Settings(
++        name=data.get("name", "Tennisbot"),
++        lang=data.get("lang", "zh-CN"),
++        default_model=data.get("default_model", "gpt-5-mini"),
++        default_temperature=data.get("default_temperature", 0.5),
++        default_max_tokens=data.get("default_max_tokens", 2048),
++        default_max_turns=data.get("default_max_turns", 20),
++        default_ignore=data.get("default_ignore"),
++    )
++
++
++settings = load_settings()

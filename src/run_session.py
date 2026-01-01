@@ -5,6 +5,7 @@ import time
 from agents import Runner, SQLiteSession, MaxTurnsExceeded
 
 from src.logger import logger
+from src.settings import settings
 
 
 def session_cleanup():
@@ -62,7 +63,7 @@ async def run_session(agent, session: SQLiteSession):
                 current_agent,
                 user_input,
                 session=session,
-                max_turns=20,
+                max_turns=settings.default_max_turns,
             )
 
             last_agent = getattr(result, "last_agent", None)
@@ -75,5 +76,3 @@ async def run_session(agent, session: SQLiteSession):
             
         except MaxTurnsExceeded:
             logger.log("chat max_turns_exceeded")
-
-        # TODO：每次会话20分钟后，自动保存会话，并创建新会话

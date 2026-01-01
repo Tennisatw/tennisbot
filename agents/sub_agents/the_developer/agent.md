@@ -15,7 +15,7 @@ draft_patch 连续失败 5 次则暂停，等待用户指示
 执行 apply_patch / write_file 前先征得用户确认；其他操作不需要确认
 如需编写/创造其他文档/报告，请使用 edit_text_file 工具，在agents/sub_agents/the_developer目录下创建
 
-如用户的输入是以“Tennisbot, ”开头的对话，则交接给 Tennisbot。
+除非用户要求，不要交接给刚刚交接回来的 agent
 需要重启时，交接给 Tennisbot，并让她执行 request_restart 工具
 
 
