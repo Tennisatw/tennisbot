@@ -1,4 +1,5 @@
 import os
+import sqlite3
 
 from agents import Runner, SQLiteSession
 
@@ -8,28 +9,35 @@ from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 
 def session_cleanup():
     """Cleanup session database files."""
-    # TODO：使用更优雅的方法清理，而不是直接删除。这样会有bug。
-    # db_path = "data/session.db"
-    # wal_path = f"{db_path}-wal"
-    # shm_path = f"{db_path}-shm"
+    db_path = "data/session.db"
+    if not os.path.exists(db_path):
+        logger.log("session.cleanup_skipped db_missing")
+        return
 
-    # if not os.path.exists(db_path):
-    #     logger.log("session.cleanup_skipped db_missing")
-    #     return
+    # Reset the session store without deleting files.
+    # This keeps the db path stable while returning to an empty state.
+    conn = sqlite3.connect(db_path, timeout=0.2)
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
 
-    # conn = sqlite3.connect(db_path, timeout=0.2)
-    # try:
-    #     conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
-    #     conn.execute("VACUUM;")
-    # finally:
-    #     conn.close()
+        tables = [
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+            )
+        ]
+        for table in tables:
+            conn.execute(f"DELETE FROM {table};")
+    finally:
+        conn.close()
 
-    # if os.path.exists(wal_path):
-    #     os.remove(wal_path)
-    # if os.path.exists(shm_path):
-    #     os.remove(shm_path)
-
-    # os.remove(db_path)
+    # VACUUM cannot run inside a transaction. Ensure the connection is closed
+    # (and any implicit transaction is ended) before compacting.
+    conn = sqlite3.connect(db_path, timeout=0.2, isolation_level=None)
+    try:
+        conn.execute("VACUUM;")
+    finally:
+        conn.close()
 
     logger.log("session.cleanup_completed")
 

@@ -1,36 +1,6 @@
-diff --git a/src/run.py b/src/run.py
---- a/src/run.py
-+++ b/src/run.py
-@@ -1,6 +1,7 @@
- import os
- import sqlite3
-+from typing import Any
- 
- from agents import Runner, SQLiteSession
- 
- from src.logger import logger
- from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
-@@ -42,6 +43,11 @@
- 
-     logger.log("session.cleanup_completed")
-+
-+
-+class NewSessionRequested(Exception):
-+    """Raised when the user requests to start a new session."""
- 
- async def run_session():
-     """Create agents and session, run the main chat loop."""
-@@ -87,6 +93,12 @@
-         name = getattr(current_agent, "name", "Agent")
-         print(f"{name}: {result.final_output}")
-         _log_chat("assistant", str(result.final_output), agent_name=name)
-+
-+        if (
-+            isinstance(result.final_output, dict)
-+            and result.final_output.get("action") == "archive_and_new_session"
-+        ):
-+            raise NewSessionRequested()
- 
- 
-         # End of session cleanup
-         # TODO: 新建agent总结会话，保存到data/session_summaries/yyyy-mm-dd_hh-mm-ss.md
+diff --git a/tests/_tmp_patch_tool/e638da481e7f41129fee9ca04aba4325.txt b/tests/_tmp_patch_tool/e638da481e7f41129fee9ca04aba4325.txt
+deleted file mode 100644
+--- a/tests/_tmp_patch_tool/e638da481e7f41129fee9ca04aba4325.txt
++++ /dev/null
+@@ -1,1 +0,0 @@
+-hello patch tool

@@ -1,4 +1,8 @@
 .venv/
 logs/
-diaries/
 .env
+__pycache__/
+data/session_summaries/
+data/session.db
+data/session.db-shm
+data/session.db-wal
