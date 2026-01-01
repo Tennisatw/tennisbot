@@ -11,6 +11,7 @@ from src.logger import logged_tool
 async def apply_patch(
     patch_path: str = "agents/sub_agents/the_developer/draft.patch",
     tool: str = "git apply",
+    allow_reject: bool = False,
     ) -> dict:
     """
     Apply a unified diff patch file via `git apply --recount`
@@ -18,6 +19,7 @@ async def apply_patch(
     Args:
         patch_path (str): Patch file path, default is "agents/sub_agents/the_developer/draft.patch".
         tool (str): "git apply" or "patch". Tool to use for applying the patch. Default is "git apply".
+        allow_reject (bool): Whether to add --reject when using git apply. Default is False.
     Returns:
         dict: {
             "success": bool,
@@ -51,8 +53,12 @@ async def apply_patch(
     if tool == "git apply":
         git_path = shutil.which("git")
         if git_path:
+            check_cmd = [git_path, "apply", "--check", "--recount", f"-p{path_strip}"]
+            if allow_reject:
+                check_cmd.append("--reject")
+            check_cmd.append(str(patch_file))
             check_proc = subprocess.run(
-                [git_path, "apply", "--check", "--recount", f"-p{path_strip}", str(patch_file)],
+                check_cmd,
                 text=True,
                 encoding="utf-8",
                 capture_output=True,
@@ -60,8 +66,12 @@ async def apply_patch(
                 timeout=60,
             )
             if check_proc.returncode == 0:
+                apply_cmd = [git_path, "apply", "--recount", f"-p{path_strip}"]
+                if allow_reject:
+                    apply_cmd.append("--reject")
+                apply_cmd.append(str(patch_file))
                 proc = subprocess.run(
-                    [git_path, "apply", "--recount", f"-p{path_strip}", str(patch_file)],
+                    apply_cmd,
                     text=True,
                     encoding="utf-8",
                     capture_output=True,
@@ -116,6 +126,7 @@ async def apply_patch(
     else:
         return {
             "success": False,
+            "tool": None,
             "error": f"Unsupported tool: {tool}",
         }
 

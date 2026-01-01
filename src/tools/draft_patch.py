@@ -10,13 +10,15 @@ from src.logger import logged_tool
 @logged_tool
 async def draft_patch(
     patch: str,
+    allow_reject: bool = False,
     ) -> dict:
     """
-    Validate a unified diff patch via `git apply --check --recount` and save it as draft.
+    Validate a unified diff patch str via `git apply --check --recount` and save it as draft.
     Note: Don't include the index line in the patch.
     Note: Patch hunks must include context lines.
     Args:
         patch (str): Unified diff string.
+        allow_reject (bool): Whether to add --reject when using git apply --check. Default is False.
     Returns:
         dict: {
             "success": bool,
@@ -52,8 +54,13 @@ diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/th
     draft_path.parent.mkdir(parents=True, exist_ok=True)
     draft_path.write_text(patch, encoding="utf-8")
 
+    cmd = [git_path, "apply", "--check", "--recount", f"-p{path_strip}"]
+    if allow_reject:
+        cmd.append("--reject")
+    cmd.append(str(draft_path))
+
     proc = subprocess.run(
-        [git_path, "apply", "--check", "--recount", f"-p{path_strip}", str(draft_path)],
+        cmd,
         text=True,
         encoding="utf-8",
         capture_output=True,

@@ -7,5 +7,4 @@
     "default_max_tokens": 2048,
     "default_max_turns": 30,
 
-    "default_ignore_folders": [".git", "__pycache__", ".venv", "logs"]
-}
+    "default_ignore": [".git", "__pycache__", ".venv", "logs", "session.db"]}

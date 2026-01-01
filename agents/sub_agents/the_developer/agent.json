@@ -9,7 +9,6 @@
         "draft_patch",
         "apply_patch",
         "write_file",
-        "request_restart",
         "openai:WebSearchTool"
     ],
     "temperature": 0.5,

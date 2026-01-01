@@ -1,69 +1,23 @@
-diff --git a/src/run.py b/src/run.py
---- a/src/run.py
-+++ b/src/run.py
-@@ -1,41 +1,94 @@
- from agents import Runner
-+from agents import SQLiteSession
-+from datetime import datetime
-+
- from src.logger import logger
-+from src.tools.archive_session import archive_session
+diff --git a/src/load_agent.py b/src/load_agent.py
+--- a/src/load_agent.py
++++ b/src/load_agent.py
+@@ -44,14 +44,14 @@
+             tool = getattr(agent_module, short_name, None)
+             if tool:
+                 # inst = LoggedOpenaiTool(tool())
+                 tools.append(tool())
+             else:
+-                print(f"Warning: Tool {tool_name} not found in agents module.")
++                logger.log(f"warn.tool_not_found_in_agents_module tool={tool_name}")
+         else:
+             # "read_files"
+             tool = globals().get(tool_name, None)
+             if tool:
+                 tools.append(tool)
+             else:
+-                print(f"Warning: Tool {tool_name} not found in src.tools.")
++                logger.log(f"warn.tool_not_found_in_src_tools tool={tool_name}")
+     return tools
  
- 
- def _log_chat(role: str, content: str, *, agent_name: str | None = None) -> None:
-@@ -16,26 +20,73 @@
-     else:
-         logger.log(f"chat role={role} content={content}")
-+
-+
-+def _new_session_id() -> str:
-+    return "tennisbot-" + datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-+
-+
-+def _should_archive_by_text(user_input: str) -> bool:
-+    text = user_input.strip()
-+    if text == "=":
-+        return True
-+    if "归档" in text and ("新会话" in text or "开启" in text or "开始" in text):
-+        return True
-+    return False
- 
- async def run(agent, session):
-@@ -45,18 +96,39 @@
-     # Keep the active agent across turns.
-     # Handoffs only affect the current Runner.run() call unless we persist it.
-     current_agent = agent
-+    main_agent = agent
-     turn = 0
-+    last_user_at = datetime.utcnow()
- 
-     while True:
-         user_input = input("User: ")
-+
-+        now = datetime.utcnow()
-+        idle_sec = (now - last_user_at).total_seconds()
-+        if idle_sec >= 20 * 60:
-+            await archive_session(session_id=session.session_id)
-+            session = SQLiteSession(_new_session_id(), db_path=session.db_path)
-+            current_agent = main_agent
-+            logger.log("session.auto_archive idle_min=20")
-+
-         turn += 1
-         logger.log(f"chat.turn={turn}")
-         _log_chat("user", user_input)
-+        last_user_at = now
-+
-+        if _should_archive_by_text(user_input):
-+            await archive_session(session_id=session.session_id)
-+            session = SQLiteSession(_new_session_id(), db_path=session.db_path)
-+            current_agent = main_agent
-+            print("Tennisbot: 已归档并开启新会话")
-+            _log_chat("assistant", "已归档并开启新会话", agent_name="Tennisbot")
-+            continue
- 
-         result = await Runner.run(
-             current_agent,
-             user_input,
-             session=session,
-             max_turns=30,
-         )
+ def load_main_agent():
+     # Load main agent from agents/agent.md

@@ -16,7 +16,7 @@ async def list_files(
     Args:
         root (str): Root directory.
         ignore (list[str] | None): Glob-style ignore patterns.
-            default is [".git", "__pycache__", ".venv", "logs"].
+            default is [".git", "__pycache__", ".venv", "logs", "session.db"].
 
     Returns:
         dict: Nested tree describing the filesystem:
@@ -31,7 +31,7 @@ async def list_files(
 
     # defaults
     if ignore is None:
-        ignore = [".git", "__pycache__", ".venv", "logs"]
+        ignore = [".git", "__pycache__", ".venv", "logs", "session.db"]
 
     # normalize patterns
     norm_pats = [p.rstrip('/').rstrip('\\') for p in ignore]
