@@ -12,10 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 from src.settings import settings
+from src.logger import logger
 
 
 dotenv.load_dotenv()
+global WEBUI
+WEBUI = True
 
+logger.setup()
+logger.log("webui.app.start")
 
 app = FastAPI(title="Tennisbot Web UI")
 
@@ -113,8 +118,8 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
     MVP behavior:
     - Accept JSON messages.
-    - If message type is `user_message`, reply with an `ack`.
-    - Otherwise, echo back an `error`.
+    If message type is "user_message", run the agent and return the response.
+    - Send back JSON messages.
     """
 
     await ws.accept()
@@ -136,10 +141,6 @@ async def ws_endpoint(ws: WebSocket) -> None:
             await send({"type": "error", "message": "invalid_json"})
             continue
 
-        if not isinstance(msg, dict):
-            await send({"type": "error", "message": "invalid_message"})
-            continue
-
         msg_type = msg.get("type")
         if msg_type != "user_message":
             await send({"type": "error", "message": "unsupported_type"})
@@ -147,6 +148,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
         message_id = msg.get("message_id")
         print(f"[ws] recv user_message id={message_id}")
+        logger.log("chat role=user input=" + msg.get("text", "").replace("\n", "\\n"))
         await send({"type": "ack", "message_id": message_id, "queue_pos": 0})
 
         user_text = msg.get("text", "")
@@ -169,6 +171,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
                     current_agent = last_agent
 
                 assistant_text = str(getattr(result, "final_output", ""))
+                logger.log("chat role=assistant name=" + getattr(current_agent, "name", "Agent") + " output=" + assistant_text.replace("\n", "\\n"))
         except Exception as e:
             print(f"[ws] runner.error id={message_id} err={e!r}")
             await send({"type": "error", "message": "runner_failed", "detail": repr(e)})
