@@ -21,7 +21,9 @@
   function connect() {
     if (ws && ws.readyState === WebSocket.OPEN) return;
 
-    const wsUrl = `ws://${location.hostname}:8000/ws`;
+    const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${wsProto}://${location.hostname}:8000/ws`;
+
     ws = new WebSocket(wsUrl);
     ws.onopen = () => {
       status = 'connected';
