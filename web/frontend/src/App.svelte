@@ -4,6 +4,7 @@
   import { tick } from 'svelte';
 
   let status: 'disconnected' | 'connected' = 'disconnected';
+  let pendingRuns = 0;
   let text = '';
   let messages: { role: 'user' | 'assistant'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
 
@@ -39,12 +40,14 @@
         const msg = JSON.parse(ev.data);
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'assistant', text: msg.text }];
+          pendingRuns = Math.max(0, pendingRuns - 1);
           return;
         }
         if (msg.type === 'error') {
           const detail = typeof msg.detail === 'string' ? `\n${msg.detail}` : '';
           const message = typeof msg.message === 'string' ? msg.message : 'unknown_error';
           messages = [...messages, { role: 'assistant', text: `[error] ${message}${detail}` }];
+          pendingRuns = Math.max(0, pendingRuns - 1);
           return;
         }
         if (msg.type === 'ack' && typeof msg.message_id === 'string') {
@@ -65,6 +68,7 @@
 
     const id = crypto.randomUUID();
     messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
+    pendingRuns += 1;
     ws.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
     text = '';
   }
@@ -76,7 +80,7 @@
   <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
     <div class="font-semibold">Tennisbot Web UI</div>
     <div class="text-xs text-gray-500">
-      {#if messages.some((m) => m.role === 'user' && m.status === 'pending')}
+      {#if pendingRuns > 0}
         thinking...
       {:else}
         {status}
