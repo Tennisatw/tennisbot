@@ -6,7 +6,7 @@
   let status: 'disconnected' | 'connected' = 'disconnected';
   let pendingRuns = 0;
   let text = '';
-  let messages: { role: 'user' | 'assistant'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
+  let messages: { role: 'user' | 'assistant' | 'meta'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
 
   let ws: WebSocket | null = null;
 
@@ -38,6 +38,10 @@
     ws.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);
+        if (msg.type === 'agent_handoff' && typeof msg.to_agent === 'string') {
+          messages = [...messages, { role: 'meta', text: `[handoff] -> ${msg.to_agent}` }];
+          return;
+        }
         if (msg.type === 'tool_call' && typeof msg.name === 'string' && typeof msg.phase === 'string') {
           const name = msg.name;
           const phase = msg.phase;
@@ -51,7 +55,7 @@
                 ? `[tool] ${name} done${elapsed}`
                 : `[tool] ${name} error${elapsed}${err}`;
 
-          messages = [...messages, { role: 'assistant', text: line }];
+          messages = [...messages, { role: 'meta', text: line }];
           return;
         }
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
@@ -106,6 +110,9 @@
 
   <section class="p-4 overflow-auto bg-gray-50">
     {#each messages as m}
+      {#if m.role === 'meta'}
+        <div class="my-1 text-sm font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
+      {:else}
       <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
         <div
           class={
@@ -121,6 +128,7 @@
           {/if}
         </div>
       </div>
+      {/if}
     {/each}
   </section>
 

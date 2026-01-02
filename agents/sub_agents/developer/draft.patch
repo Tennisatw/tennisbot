@@ -1,33 +1,13 @@
 diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
 --- a/web/frontend/src/App.svelte
 +++ b/web/frontend/src/App.svelte
-@@ -6,7 +6,7 @@
- 
-   let status: 'disconnected' | 'connected' = 'disconnected';
-   let pendingRuns = 0;
-   let text = '';
--  let messages: { role: 'user' | 'assistant'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
-+  let messages: { role: 'user' | 'assistant' | 'meta'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
-@@ -52,7 +52,7 @@
- 
-           const line =
-             phase === 'start'
-               ? `[tool] ${name}...`
-               : phase === 'end'
-                 ? `[tool] ${name} done${elapsed}`
-                 : `[tool] ${name} error${elapsed}${err}`;
- 
--          messages = [...messages, { role: 'assistant', text: line }];
-+          messages = [...messages, { role: 'meta', text: line }];
-           return;
-         }
-@@ -115,6 +115,10 @@
- 
+@@ -88,7 +88,7 @@
    <section class="p-4 overflow-auto bg-gray-50">
      {#each messages as m}
-+      {#if m.role === 'meta'}
-+        <div class="my-1 text-sm text-gray-600 whitespace-pre-wrap">{m.text}</div>
-+      {:else}
+       {#if m.role === 'meta'}
+-        <div class="my-1 text-sm text-gray-600 whitespace-pre-wrap">{m.text}</div>
++        <div class="my-1 text-sm font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
+       {:else}
        <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
          <div
            class={
@@ -43,6 +23,6 @@ diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
            {/if}
          </div>
        </div>
-+      {/if}
+       {/if}
      {/each}
    </section>
