@@ -1,5 +1,6 @@
 import asyncio
 import dotenv
+import datetime
 
 from agents import SQLiteSession
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
@@ -28,6 +29,9 @@ if __name__ == "__main__":
 
             # Create a session
             session = SQLiteSession("0", db_path="data/sessions/0.db")
+            # For multi-session (reserved)
+            # datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # session = SQLiteSession("0", db_path=f"data/sessions/{datetime_str}.db")
 
             # Start session
             asyncio.run(run_session(agent, session))
@@ -37,7 +41,7 @@ if __name__ == "__main__":
             # Raised by archive_session tool
             if e.code == 94: # Start a new session
                 logger.log("app.start_new_session")
-                session_cleanup()
+                session_cleanup(session_path="data/sessions/0.db")
 
             # Raised by request_restart tool
             elif e.code == 95: # Exit application

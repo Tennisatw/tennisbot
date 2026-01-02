@@ -43,7 +43,7 @@ Agent 相关（agents/）：
 数据（data/）：
     app配置：data/setting.json
     定时/周期性任务记录：data/schedule.json
-    当前会话文件：data/session.db
+    当前会话文件：data/sessions/0.db
 
 程序运行记录：logs/yyyy-mm-dd.log
 
@@ -53,3 +53,5 @@ tests/
 附：环境与框架：
 运行环境：uv（Python 3.13.x）
 Agent 框架：OpenAI Agents SDK（Python）；官网：https://openai.github.io/openai-agents-python/
+WebUI：FastAPI + Svelte（or Vue）（之后考虑(Tailscale)）
+（语音：语音输入转文本，走非流式TTS。）

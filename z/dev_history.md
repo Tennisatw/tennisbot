@@ -92,4 +92,5 @@
 
 2026.01.01:
 
-完善了session_cleanup
+完善了session_cleanup，还是有点问题，但先将就用着。
+禁用了archive_session工具，现在只能通过热键归档会话。因为Tennisbot经常误用此工具。

@@ -8,16 +8,15 @@ from src.logger import logger
 from src.settings import settings
 
 
-def session_cleanup():
+def session_cleanup(session_path: str = "data/sessions/0.db"):
     """Cleanup session database files."""
-    db_path = "data/sessions/0.db"
-    if not os.path.exists(db_path):
+    if not os.path.exists(session_path):
         logger.log("session.cleanup_skipped db_missing")
         return
 
     # Reset the session store without deleting files.
     # This keeps the db path stable while returning to an empty state.
-    conn = sqlite3.connect(db_path, timeout=0.2)
+    conn = sqlite3.connect(session_path, timeout=0.2)
     try:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
 
@@ -34,7 +33,7 @@ def session_cleanup():
 
     time.sleep(0.1) # otherwise: "cannot VACUUM from within a transaction"
 
-    conn2 = sqlite3.connect(db_path, timeout=0.2)
+    conn2 = sqlite3.connect(session_path, timeout=0.2)
     try:
         conn2.execute("VACUUM;")
     finally:

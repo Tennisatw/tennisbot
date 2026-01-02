@@ -1,20 +1,7 @@
-diff --git a/data/setting.json b/data/setting.json
---- a/data/setting.json
-+++ b/data/setting.json
-@@ -5,17 +5,19 @@
-     "default_max_turns": 20,
- 
-     "default_ignore": [
-+        ".env",
-         ".git",
-         "__pycache__",
-         ".venv",
-         "logs",
-         "*.db",
-         "*.db-wal",
-         "*.db-shm",
-         ".pytest_cache",
-+        "uv.lock",
-         ".vscode",
-         "z"
-     ]}
+diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/the_developer/template.txt
+--- a/agents/sub_agents/the_developer/template.txt
++++ b/agents/sub_agents/the_developer/template.txt
+@@ -1,2 +1,3 @@
+ Hello Tennisbot
+ Love from Tennisatw
++Hello world
