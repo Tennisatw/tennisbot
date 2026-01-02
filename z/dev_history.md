@@ -1,6 +1,7 @@
 2025.12.15:
 
 创建仓库，新建初始文件
+（下载并安装uv）
 创建环境：
 
     uv init
@@ -94,3 +95,9 @@
 
 完善了session_cleanup，还是有点问题，但先将就用着。
 禁用了archive_session工具，现在只能通过热键归档会话。因为Tennisbot经常误用此工具。
+开发WebUI。
+（下载并安装Node.js）
+
+    uv add fastapi uvicorn
+    uv add "uvicorn[standard]"
+    npm i -g pnpm

@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Start Tennisbot",
+      "label": "Start Tennisbot CLI",
       "type": "shell",
-      "command": "./start.bat",
+      "command": "./start_cli.bat",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -12,7 +12,23 @@
       },
       "options": {
         "statusbar": {
-          "label" : "$(play) Start Tennisbot",
+          "label" : "$(play) Start Tennisbot CLI",
+          // "color" : "#5b60df",
+        }
+      }
+    },
+    {
+      "label": "Start Tennisbot WebUI",
+      "type": "shell",
+      "command": "./start_webui.bat",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "close": true
+      },
+      "options": {
+        "statusbar": {
+          "label" : "$(browser) Start Tennisbot WebUI",
           // "color" : "#5b60df",
         }
       }

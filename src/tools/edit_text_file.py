@@ -1,3 +1,5 @@
+import os
+
 from agents import function_tool
 from src.logger import logged_tool
 
@@ -29,6 +31,9 @@ async def edit_text_file(
                 "error": "Can only append to .txt or .md files.",
             }
 
+        dirpath = os.path.dirname(path)
+        if dirpath:
+            os.makedirs(dirpath, exist_ok=True)
         with open(path, mode, encoding="utf-8", errors="ignore") as f:
             f.write(content)
         return {

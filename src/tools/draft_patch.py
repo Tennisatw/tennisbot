@@ -39,9 +39,9 @@ async def draft_patch(
 
     Git-style unified patch example:
 ```
-diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/the_developer/template.txt
---- a/agents/sub_agents/the_developer/template.txt
-+++ b/agents/sub_agents/the_developer/template.txt
+diff --git a/agents/sub_agents/developer/template.txt b/agents/sub_agents/developer/template.txt
+--- a/agents/sub_agents/developer/template.txt
++++ b/agents/sub_agents/developer/template.txt
 @@ -1,2 +1,3 @@
  Hello Tennisbot
  Love from Tennisatw
@@ -62,7 +62,7 @@ diff --git a/agents/sub_agents/the_developer/template.txt b/agents/sub_agents/th
             "error": "Git not found in PATH",
         }
 
-    draft_path = Path("agents/sub_agents/the_developer/draft.patch")
+    draft_path = Path("agents/sub_agents/developer/draft.patch")
     draft_path.parent.mkdir(parents=True, exist_ok=True)
     draft_path.write_text(patch, encoding="utf-8")
 

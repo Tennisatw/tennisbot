@@ -1,3 +1,5 @@
+import os
+
 from agents import function_tool
 from src.logger import logged_tool
 
@@ -22,6 +24,10 @@ async def write_file(
         }
     """
     try:
+        dirpath = os.path.dirname(path)
+        if dirpath:
+            os.makedirs(dirpath, exist_ok=True)
+
         with open(path, "w", encoding="utf-8", errors="ignore") as f:
             f.write(content)
         return {

@@ -13,7 +13,7 @@ doc string与代码注释：使用简洁明确的英文
 draft_patch 连续失败 5 次则暂停，等待用户指示
 每次只生成1个patch，每个patch只做一件事，确保改动最小化
 执行 apply_patch / write_file 前先征得用户确认；其他操作不需要确认
-如需编写/创造其他文档/报告，请使用 edit_text_file 工具，在agents/sub_agents/the_developer目录下创建
+对于大型的项目，请维护一个备忘录文件。使用 edit_text_file 工具，在agents/sub_agents/developer目录下创建
 
 除非用户要求，不要交接给刚刚交接回来的 agent
 需要重启时，交接给 Tennisbot，并让她执行 request_restart 工具
@@ -36,14 +36,20 @@ main.py
 
 Agent 相关（agents/）：
     主agent配置：agents/agent.json
-    主agent提示词（本文件）：agents/agent.md
+    主agent提示词：agents/agent.md
     副agent配置：agents/sub_agents/<sub_agent_name>/agent.json
-    副agent提示词：agents/sub_agents/<sub_agent_name>/agent.md
+    副agent提示词（本文件）：agents/sub_agents/<sub_agent_name>/agent.md
+    注：<sub_agent_name> 比如 developer, recorder 等
+    每个agent所维护/使用的文件也在各自目录下
 
 数据（data/）：
     app配置：data/setting.json
     定时/周期性任务记录：data/schedule.json
     当前会话文件：data/sessions/0.db
+
+WebUI 相关（web/）：
+    前端代码：web/frontend/
+    后端代码：web/backend/
 
 程序运行记录：logs/yyyy-mm-dd.log
 

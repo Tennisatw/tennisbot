@@ -105,3 +105,47 @@ Example:
 - Concurrency (single session): allow continuous inputs; backend should **queue** requests per session and run them sequentially.
 - Startup: `start.bat` should **start both backend and frontend** (one-command dev startup).
 - CORS: enable CORS in FastAPI for dev (frontend dev server origin, e.g. `http://localhost:5173`).
+
+## Change Log (This Session)
+- Added backend skeleton:
+  - `web/backend/app.py`
+    - FastAPI app with CORS allowing `http://localhost:5173`
+    - `GET /api/health` returns `{ "status": "ok" }`
+    - `WS /ws` placeholder: accepts `user_message` and replies `ack` (no queue yet)
+  - `web/backend/__init__.py`
+- Added frontend skeleton (Svelte + Vite + TypeScript):
+  - `web/frontend/package.json` (pnpm scripts)
+  - `web/frontend/vite.config.ts`
+  - `web/frontend/tsconfig.json`
+  - `web/frontend/index.html`
+  - `web/frontend/src/main.ts`
+  - `web/frontend/src/App.svelte` (minimal chat UI)
+  - `web/frontend/src/app.css`
+  - `web/frontend/src/vite-env.d.ts`
+- Tailwind integration (incremental):
+  - `web/frontend/tailwind.config.js`
+  - `web/frontend/postcss.config.js`
+  - Updated `web/frontend/package.json` to include `tailwindcss`, `postcss`, `autoprefixer`
+  - Updated `web/frontend/src/app.css` to Tailwind directives
+  - Updated `web/frontend/src/App.svelte` to use Tailwind classes (removed inline CSS)
+- Svelte 5 compatibility fix:
+  - Updated `web/frontend/vite.config.ts` to set `compilerOptions.compatibility.componentApi = 4`
+- Added dev startup script:
+  - `start_web.bat` (opens two windows: backend on 8000, frontend on 5173)
+
+## Notes / Current Issues
+- Backend WebSocket currently fails without a WS library in the Python env.
+  - Uvicorn warns: "No supported WebSocket library detected".
+  - Fix: install `uvicorn[standard]` (recommended) or `websockets`/`wsproto`.
+
+## Notes / Current Issues
+- Backend WebSocket dependency resolved: `uvicorn[standard]` installed, WS now works.
+- Current behavior:
+  - Backend replies only `ack` (no `assistant_message` yet).
+  - Frontend currently renders only user messages; it will render assistant messages when backend starts sending `assistant_message`.
+- Next suggested steps (keep one change per patch):
+  1) Backend: implement per-session queue + send `assistant_message` (start with echo), keep `message_id` mapping.
+  2) Backend: replace echo with real `Runner.run(...)` output (non-streaming).
+  3) Frontend: add basic components split (ChatView/Composer/SessionBar) once behavior stabilizes.
+  4) Decide whether to merge `start_web.bat` into `start.bat` or keep separate.
+

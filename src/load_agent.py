@@ -106,7 +106,7 @@ def load_sub_agents(handoffs):
             instructions = f.read().replace("<ROOT_PATH>", ROOT_PATH)
 
             sub_agents.append(Agent(
-                name="Tennisbot " + dirs,
+                name="Tennisbot the " + dirs,
                 instructions=instructions,
                 model=model,
                 tools=tools,
@@ -125,7 +125,7 @@ def create_handoff_obj(agent):
             agent_config = json.load(f)
             tool_description = agent_config.get("handoff_description", "")
     else:
-        folder_name = agent.name.replace("Tennisbot ", "")
+        folder_name = agent.name.replace("Tennisbot the ", "")
         with open(f"agents/sub_agents/{folder_name}/agent.json", "r", encoding="utf-8") as f:
             agent_config = json.load(f)
             tool_description = agent_config.get("handoff_description", "")

@@ -9,6 +9,7 @@
         ".git",
         "__pycache__",
         ".venv",
+        "node_modules",
         "logs",
         "*.db",
         "*.db-wal",
