@@ -12,7 +12,7 @@ async def run_shell(
     cwd: str | None = None,
     timeout_sec: int = 60,
 ) -> dict:
-    """Run a shell command.
+    """Run a shell command. Use with caution.
 
     Args:
         command: Command string.
@@ -22,6 +22,7 @@ async def run_shell(
 
     Returns:
         dict: {
+            "success": bool,
             "stdout": str,
             "stderr": str,
             "exit_code": int,
@@ -43,12 +44,14 @@ async def run_shell(
             timeout=timeout_sec,
         )
         return {
+            "success": cp.returncode == 0,
             "stdout": cp.stdout or "",
             "stderr": cp.stderr or "",
             "exit_code": cp.returncode,
         }
     except subprocess.TimeoutExpired as e:
         return {
+            "success": False,
             "stdout": getattr(e, "stdout", "") or "",
             "stderr": getattr(e, "stderr", "") or "timeout",
             "exit_code": -1,

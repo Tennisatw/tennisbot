@@ -1,57 +1,16 @@
-diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
---- a/web/frontend/src/App.svelte
-+++ b/web/frontend/src/App.svelte
-@@ -4,6 +4,7 @@
-   import { marked } from 'marked';
-   import { tick } from 'svelte';
+diff --git a/web/backend/app.py b/web/backend/app.py
+--- a/web/backend/app.py
++++ b/web/backend/app.py
+@@ -155,6 +155,7 @@
+     - Send back JSON messages.
+     """
  
-   let status: 'disconnected' | 'connected' = 'disconnected';
-+  let pendingRuns = 0;
-   let text = '';
-   let messages: { role: 'user' | 'assistant'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
- 
-   let ws: WebSocket | null = null;
-@@ -37,6 +38,10 @@
-         const msg = JSON.parse(ev.data);
-         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
-           messages = [...messages, { role: 'assistant', text: msg.text }];
-+          pendingRuns = Math.max(0, pendingRuns - 1);
-           return;
-         }
-         if (msg.type === 'error') {
-           const detail = typeof msg.detail === 'string' ? `\n${msg.detail}` : '';
-           const message = typeof msg.message === 'string' ? msg.message : 'unknown_error';
-           messages = [...messages, { role: 'assistant', text: `[error] ${message}${detail}` }];
-+          pendingRuns = Math.max(0, pendingRuns - 1);
-           return;
-         }
-         if (msg.type === 'ack' && typeof msg.message_id === 'string') {
-           messages = messages.map((m) =>
-             m.role === 'user' && m.id === msg.message_id ? { ...m, status: 'sent' } : m
-           );
-         }
-       } catch {
-         // ignore
-       }
-     };
-   }
-@@ -53,6 +58,7 @@
- 
-     const id = crypto.randomUUID();
-     messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
-+    pendingRuns += 1;
-     ws.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
-     text = '';
-   }
-@@ -66,7 +72,7 @@
-   <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-     <div class="font-semibold">Tennisbot Web UI</div>
-     <div class="text-xs text-gray-500">
--      {#if messages.some((m) => m.role === 'user' && m.status === 'pending')}
-+      {#if pendingRuns > 0}
-         thinking...
-       {:else}
-         {status}
-       {/if}
-     </div>
-   </header>
+     await ws.accept()
++    await event_bus.add(ws)
+     lock = asyncio.Lock()
+@@ -169,6 +170,7 @@
+         try:
+             raw = await ws.receive_text()
+         except Exception:
++            await event_bus.remove(ws)
+             return

@@ -1,3 +1,6 @@
+# 因为要使用webui，所以此工具只能暂时禁用
+
+
 from agents import function_tool
 from src.logger import logged_tool
 

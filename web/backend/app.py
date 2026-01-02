@@ -25,6 +25,69 @@ logger.log("webui.app.start")
 app = FastAPI(title="Tennisbot Web UI")
 
 
+class EventBus:
+    """Async event bus for pushing server-side events to WebSocket clients."""
+
+    def __init__(self, *, maxsize: int = 2000):
+        self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=maxsize)
+        self._clients: set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    def publish(self, payload: dict[str, Any]) -> None:
+        """Publish an event.
+
+        Notes:
+            - Non-blocking. Drops events when queue is full.
+        """
+
+        try:
+            self._queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            return
+
+    async def add(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.add(ws)
+
+    async def remove(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.discard(ws)
+
+    async def run(self) -> None:
+        """Broadcast loop."""
+
+        while True:
+            payload = await self._queue.get()
+            data = json.dumps(payload, ensure_ascii=False)
+
+            async with self._lock:
+                clients = list(self._clients)
+
+            if not clients:
+                continue
+
+            dead: list[WebSocket] = []
+            for ws in clients:
+                try:
+                    await ws.send_text(data)
+                except Exception:
+                    dead.append(ws)
+
+            if dead:
+                async with self._lock:
+                    for ws in dead:
+                        self._clients.discard(ws)
+
+
+event_bus = EventBus()
+logger.emit = event_bus.publish
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    asyncio.create_task(event_bus.run())
+
+
 def _extract_text(message_data: dict[str, Any]) -> str:
     """Extract plain text from a stored agent message."""
 
@@ -123,6 +186,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
     """
 
     await ws.accept()
+    await event_bus.add(ws)
     lock = asyncio.Lock()
 
     async def send(payload: dict[str, Any]) -> None:
@@ -133,6 +197,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
         try:
             raw = await ws.receive_text()
         except Exception:
+            await event_bus.remove(ws)
             return
 
         try:

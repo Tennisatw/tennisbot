@@ -22,6 +22,7 @@ async def list_files(
     Returns:
         dict: Nested tree describing the filesystem:
             {
+              "success": bool,
               "name": base name,
               "path": POSIX path relative to root ('.' for root),
               "type": "dir" | "file" | "symlink",
@@ -57,6 +58,7 @@ async def list_files(
 
     if not os.path.exists(abs_root):
         return {
+            'success': False,
             'name': os.path.basename(abs_root) or abs_root,
             'path': '.',
             'type': 'dir',
@@ -80,6 +82,7 @@ async def list_files(
                 node_type = 'file'
 
             node = {
+                'success': True,
                 'name': name,
                 'path': to_posix(rel_path),
                 'type': node_type,
@@ -104,6 +107,7 @@ async def list_files(
 
         except Exception as e:
             return {
+                'success': False,
                 'name': name,
                 'path': to_posix(rel_path),
                 'type': 'file',

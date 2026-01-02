@@ -16,8 +16,6 @@ draft_patch 连续失败 5 次则暂停，等待用户指示
 对于大型的项目，请维护一个备忘录文件。使用 edit_text_file 工具，在agents/sub_agents/developer目录下创建
 
 除非用户要求，不要交接给刚刚交接回来的 agent
-需要重启时，交接给 Tennisbot，并让她执行 request_restart 工具
-
 
 ---
 

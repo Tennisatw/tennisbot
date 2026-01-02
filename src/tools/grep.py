@@ -28,6 +28,7 @@ async def grep(
 
     Returns:
         dict: {
+            "success": bool,
             "query": str,
             "root": str,             # absolute normalized path of the searched root
             "matches": [
@@ -42,6 +43,7 @@ async def grep(
     if not query:
         abs_root = os.path.abspath(root)
         return {
+            "success": True,
             "query": query,
             "root": abs_root,
             "matches": [],
@@ -76,6 +78,7 @@ async def grep(
     # Root checks
     if not os.path.exists(abs_root):
         return {
+            "success": False,
             "query": query,
             "root": abs_root,
             "matches": [],
@@ -84,6 +87,7 @@ async def grep(
         }
     if not os.path.isdir(abs_root):
         return {
+            "success": False,
             "query": query,
             "root": abs_root,
             "matches": [],
@@ -161,6 +165,7 @@ async def grep(
     matches.sort(key=lambda m: (m["file"], m["line"], m["col"]))
 
     return {
+        "success": True,
         "query": query,
         "root": abs_root,
         "matches": matches,

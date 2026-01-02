@@ -5,7 +5,6 @@
         "read_file",
         "edit_text_file",
         "grep",
-        "request_restart",
         "openai:WebSearchTool"
     ],
     "temperature": 1,

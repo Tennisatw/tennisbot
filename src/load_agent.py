@@ -130,9 +130,13 @@ def create_handoff_obj(agent):
             agent_config = json.load(f)
             tool_description = agent_config.get("handoff_description", "")
 
+    def on_handoff(_):
+        logger.log(f"agent.handoff to {agent.name}")
+        logger.emit({"type": "agent_handoff", "to_agent": agent.name})
+
     handoff_obj = handoff(
         agent=agent,
-        on_handoff=lambda _: logger.log(f"agent.handoff to {agent.name}"),
+        on_handoff=on_handoff,
         tool_description_override=tool_description
     )
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
+from typing import Any, Callable
 
 
 def _normalize_value(v, *, max_len: int | None = 100):
@@ -42,7 +43,14 @@ def logged_tool(fn):
             parts.append(f"{k}={_normalize_value(v)}")
         logger.log(" ".join(parts))
 
-        output = await fn(*args, **kwargs)
+        logger.emit({"type": "tool_call", "name": name, "phase": "start"})
+
+        try:
+            output = await fn(*args, **kwargs)
+        except Exception as e:
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            logger.emit({"type": "tool_call", "name": name, "phase": "error"})
+            raise
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         msgs = [f"tool.{name}.output", f"elapsed_ms={elapsed_ms}", "output:"]
@@ -52,12 +60,15 @@ def logged_tool(fn):
         elif isinstance(output, str):
             msgs.append(f"{_normalize_value(output)}")
         logger.log(" ".join(msgs))
+
+        success = bool(output["success"]) if isinstance(output, dict) else False
+        logger.emit({"type": "tool_call", "name": name, "phase": "end", "success": success})
         return output
 
     return wrapper
 
 
-@dataclass(frozen=True)
+@dataclass()
 class Logger:
     """App logger wrapper.
 
@@ -114,6 +125,16 @@ class Logger:
         self._ensure_today_file()
         logging.getLogger(self.name).info(message)
         print(message if len(message) < 80 else message[:77] + "...")
+
+    def emit(self, payload: dict[str, Any]) -> None:
+        """Emit a structured event.
+
+        Notes:
+            - Default behavior is to log it as a single line.
+            - Web backends may monkey-patch this method to forward events.
+        """
+
+        self.log(f"event {payload}")
 
 
 logger = Logger()
