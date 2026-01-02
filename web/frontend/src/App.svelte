@@ -1,14 +1,28 @@
 <script lang="ts">
+  import DOMPurify from 'dompurify';
+  import { marked } from 'marked';
+  import { tick } from 'svelte';
+
   let status: 'disconnected' | 'connected' = 'disconnected';
   let text = '';
-  let messages: { role: 'user' | 'assistant'; text: string }[] = [];
+  let messages: { role: 'user' | 'assistant'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
 
   let ws: WebSocket | null = null;
+
+  marked.setOptions({
+    gfm: true,
+    breaks: true
+  });
+
+  function renderMarkdown(src: string): string {
+    return DOMPurify.sanitize(marked.parse(src) as string);
+  }
 
   function connect() {
     if (ws && ws.readyState === WebSocket.OPEN) return;
 
-    ws = new WebSocket('ws://127.0.0.1:8000/ws');
+    const wsUrl = `ws://${location.hostname}:8000/ws`;
+    ws = new WebSocket(wsUrl);
     ws.onopen = () => {
       status = 'connected';
     };
@@ -23,6 +37,18 @@
         const msg = JSON.parse(ev.data);
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'assistant', text: msg.text }];
+          return;
+        }
+        if (msg.type === 'error') {
+          const detail = typeof msg.detail === 'string' ? `\n${msg.detail}` : '';
+          const message = typeof msg.message === 'string' ? msg.message : 'unknown_error';
+          messages = [...messages, { role: 'assistant', text: `[error] ${message}${detail}` }];
+          return;
+        }
+        if (msg.type === 'ack' && typeof msg.message_id === 'string') {
+          messages = messages.map((m) =>
+            m.role === 'user' && m.id === msg.message_id ? { ...m, status: 'sent' } : m
+          );
         }
       } catch {
         // ignore
@@ -35,8 +61,9 @@
     const t = text.trim();
     if (!t) return;
 
-    messages = [...messages, { role: 'user', text: t }];
-    ws.send(JSON.stringify({ type: 'user_message', message_id: crypto.randomUUID(), text: t }));
+    const id = crypto.randomUUID();
+    messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
+    ws.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
     text = '';
   }
 
@@ -46,7 +73,13 @@
 <main class="h-screen grid grid-rows-[auto_1fr_auto]">
   <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
     <div class="font-semibold">Tennisbot Web UI</div>
-    <div class="text-xs text-gray-500">{status}</div>
+    <div class="text-xs text-gray-500">
+      {#if messages.some((m) => m.role === 'user' && m.status === 'pending')}
+        thinking...
+      {:else}
+        {status}
+      {/if}
+    </div>
   </header>
 
   <section class="p-4 overflow-auto bg-gray-50">
@@ -59,7 +92,11 @@
               : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
           }
         >
-          {m.text}
+          {#if m.role === 'assistant'}
+            <div class="prose prose-sm max-w-none">{@html renderMarkdown(m.text)}</div>
+          {:else}
+            {m.text}{m.role === 'user' && m.status === 'pending' ? ' (sending...)' : ''}
+          {/if}
         </div>
       </div>
     {/each}

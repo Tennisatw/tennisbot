@@ -101,3 +101,7 @@
     uv add fastapi uvicorn
     uv add "uvicorn[standard]"
     npm i -g pnpm
+
+    (经过一番debug之后)
+    cd ./web/frontend/
+    pnpm install

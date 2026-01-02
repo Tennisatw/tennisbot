@@ -149,3 +149,42 @@ Example:
   3) Frontend: add basic components split (ChatView/Composer/SessionBar) once behavior stabilizes.
   4) Decide whether to merge `start_web.bat` into `start.bat` or keep separate.
 
+
+
+## Change Log (This Session)
+
+### Backend (FastAPI)
+- WS `/ws`:
+  - Implemented real agent execution via `Runner.run(...)` (non-streaming), and send `assistant_message`.
+  - Added `assistant_message.message_id` (server-generated UUID) and `parent_id` (original user `message_id`).
+  - Added a global `run_lock` to serialize runs (single-session stability).
+  - Added `dotenv.load_dotenv()` and verbose debug logs around WS receive/run/send.
+  - Error handling: send `{type:"error", message:"runner_failed", detail:...}`.
+- Session DB separation:
+  - WebUI now uses `SQLiteSession("1", db_path="data/sessions/1.db")`.
+  - `/api/messages` reads from `data/sessions/1.db` and filters `session_id="1"`.
+- Added HTTP history endpoint:
+  - `GET /api/messages?limit=50` returns recent `{id, role, text}` for user/assistant.
+
+### Frontend (Svelte + Tailwind)
+- WS protocol handling:
+  - Render `error` events in chat (as assistant messages).
+  - Added user message `id/status` and `ack` handling to mark pending -> sent.
+  - Added header status UX:
+    - Show `thinking...` when any user message is pending; otherwise show `connected/disconnected`.
+  - Added auto-scroll to bottom after sending.
+- Markdown rendering:
+  - Added `marked` + `dompurify` and render assistant messages via `{@html renderMarkdown(...)}`.
+  - Added Tailwind Typography (`@tailwindcss/typography`) and wrapped assistant output with `prose`.
+
+### Dev / Networking
+- Mobile access fixes:
+  - Vite server host changed to `0.0.0.0`.
+  - WS URL changed to `ws://${location.hostname}:8000/ws`.
+  - `start_webui.bat` backend host changed to `0.0.0.0`.
+  - Suggested Windows Firewall inbound rules for ports 5173/8000.
+
+## Notes / Current Issues
+- Patch application occasionally produced `.rej` files when using `--reject`; user may need to delete `web/frontend/src/App.svelte.rej` if present.
+- Mobile can load UI and WS shows `connected`, but clicking Send does not result in backend receiving `user_message`.
+  - Next step (not applied yet): add a local UI error when `ws.readyState` is not OPEN inside `send()` to diagnose whether `send()` is triggered.
