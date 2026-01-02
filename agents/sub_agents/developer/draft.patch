@@ -1,16 +1,48 @@
-diff --git a/web/backend/app.py b/web/backend/app.py
---- a/web/backend/app.py
-+++ b/web/backend/app.py
-@@ -155,6 +155,7 @@
-     - Send back JSON messages.
-     """
+diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
+--- a/web/frontend/src/App.svelte
++++ b/web/frontend/src/App.svelte
+@@ -6,7 +6,7 @@
  
-     await ws.accept()
-+    await event_bus.add(ws)
-     lock = asyncio.Lock()
-@@ -169,6 +170,7 @@
-         try:
-             raw = await ws.receive_text()
-         except Exception:
-+            await event_bus.remove(ws)
-             return
+   let status: 'disconnected' | 'connected' = 'disconnected';
+   let pendingRuns = 0;
+   let text = '';
+-  let messages: { role: 'user' | 'assistant'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
++  let messages: { role: 'user' | 'assistant' | 'meta'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
+@@ -52,7 +52,7 @@
+ 
+           const line =
+             phase === 'start'
+               ? `[tool] ${name}...`
+               : phase === 'end'
+                 ? `[tool] ${name} done${elapsed}`
+                 : `[tool] ${name} error${elapsed}${err}`;
+ 
+-          messages = [...messages, { role: 'assistant', text: line }];
++          messages = [...messages, { role: 'meta', text: line }];
+           return;
+         }
+@@ -115,6 +115,10 @@
+ 
+   <section class="p-4 overflow-auto bg-gray-50">
+     {#each messages as m}
++      {#if m.role === 'meta'}
++        <div class="my-1 text-sm text-gray-600 whitespace-pre-wrap">{m.text}</div>
++      {:else}
+       <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
+         <div
+           class={
+             m.role === 'user'
+               ? 'max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 whitespace-pre-wrap'
+               : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
+           }
+         >
+           {#if m.role === 'assistant'}
+             <div class="prose prose-sm max-w-none">{@html renderMarkdown(m.text)}</div>
+           {:else}
+             {m.text}{m.role === 'user' && m.status === 'pending' ? ' (sending...)' : ''}
+           {/if}
+         </div>
+       </div>
++      {/if}
+     {/each}
+   </section>

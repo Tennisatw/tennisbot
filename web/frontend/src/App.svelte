@@ -38,6 +38,22 @@
     ws.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);
+        if (msg.type === 'tool_call' && typeof msg.name === 'string' && typeof msg.phase === 'string') {
+          const name = msg.name;
+          const phase = msg.phase;
+          const elapsed = typeof msg.elapsed_ms === 'number' ? ` (${msg.elapsed_ms}ms)` : '';
+          const err = typeof msg.error === 'string' ? `: ${msg.error}` : '';
+
+          const line =
+            phase === 'start'
+              ? `[tool] ${name}...`
+              : phase === 'end'
+                ? `[tool] ${name} done${elapsed}`
+                : `[tool] ${name} error${elapsed}${err}`;
+
+          messages = [...messages, { role: 'assistant', text: line }];
+          return;
+        }
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'assistant', text: msg.text }];
           pendingRuns = Math.max(0, pendingRuns - 1);
