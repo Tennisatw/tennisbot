@@ -1,28 +1,14 @@
 diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
 --- a/web/frontend/src/App.svelte
 +++ b/web/frontend/src/App.svelte
-@@ -88,7 +88,7 @@
-   <section class="p-4 overflow-auto bg-gray-50">
-     {#each messages as m}
-       {#if m.role === 'meta'}
--        <div class="my-1 text-sm text-gray-600 whitespace-pre-wrap">{m.text}</div>
-+        <div class="my-1 text-sm font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
-       {:else}
-       <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
-         <div
-           class={
-             m.role === 'user'
-               ? 'max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 whitespace-pre-wrap'
-               : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
-           }
+@@ -142,9 +142,9 @@
          >
            {#if m.role === 'assistant'}
-             <div class="prose prose-sm max-w-none">{@html renderMarkdown(m.text)}</div>
+-            <div class="prose prose-base max-w-none">{@html renderMarkdown(m.text)}</div>
++            <div class="prose prose-base leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
            {:else}
-             {m.text}{m.role === 'user' && m.status === 'pending' ? ' (sending...)' : ''}
+-            <div class="prose prose-base prose-invert max-w-none">{@html renderMarkdown(m.text)}</div>{m.role === 'user' && m.status === 'pending' ? ' (sending...)' : ''}
++            <div class="prose prose-base prose-invert leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>{m.role === 'user' && m.status === 'pending' ? ' (sending...)' : ''}
            {/if}
          </div>
        </div>
-       {/if}
-     {/each}
-   </section>

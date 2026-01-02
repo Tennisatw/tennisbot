@@ -43,6 +43,8 @@ def logged_tool(fn):
             parts.append(f"{k}={_normalize_value(v)}")
         logger.log(" ".join(parts))
 
+        logger.emit({"type": "tool_call", "name": name, "phase": "start"})
+
         try:
             output = await fn(*args, **kwargs)
         except Exception as e:

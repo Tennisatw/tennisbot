@@ -15,8 +15,13 @@
     breaks: true
   });
 
+  function normalizeMarkdown(src: string): string {
+    return src.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
   function renderMarkdown(src: string): string {
-    return DOMPurify.sanitize(marked.parse(src) as string);
+    const normalized = normalizeMarkdown(src);
+    return DOMPurify.sanitize(marked.parse(normalized) as string);
   }
 
   function connect() {
@@ -98,8 +103,8 @@
 
 <main class="h-screen grid grid-rows-[auto_1fr_auto]">
   <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-    <div class="font-semibold">Tennisbot Web UI</div>
-    <div class="text-xs text-gray-500">
+    <div class="text-lg font-semibold">Tennisbot Web UI</div>
+    <div class="text-base text-gray-500">
       {#if pendingRuns > 0}
         thinking...
       {:else}
@@ -111,7 +116,7 @@
   <section class="p-4 overflow-auto bg-gray-50">
     {#each messages as m}
       {#if m.role === 'meta'}
-        <div class="my-1 text-sm font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
+        <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
       {:else}
       <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
         <div
@@ -122,9 +127,9 @@
           }
         >
           {#if m.role === 'assistant'}
-            <div class="prose prose-sm max-w-none">{@html renderMarkdown(m.text)}</div>
+            <div class="prose prose-base leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
           {:else}
-            {m.text}{m.role === 'user' && m.status === 'pending' ? ' (sending...)' : ''}
+            <div class="prose prose-base prose-invert leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>{m.role === 'user' && m.status === 'pending' ? ' (sending...)' : ''}
           {/if}
         </div>
       </div>
@@ -134,14 +139,14 @@
 
   <footer class="flex gap-2 px-4 py-3 border-t border-gray-200">
     <textarea
-      class="flex-1 px-3 py-2 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
+      class="flex-1 px-3 py-2 text-base rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
       rows={3}
       placeholder="Type a message..."
       bind:value={text}
       on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
     ></textarea>
     <button
-      class="px-4 py-2 rounded-xl border border-gray-900 bg-gray-900 text-white"
+      class="px-4 py-2 text-base rounded-xl border border-gray-900 bg-gray-900 text-white"
       on:click={send}
     >
       Send
