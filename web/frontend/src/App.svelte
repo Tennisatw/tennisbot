@@ -105,12 +105,13 @@
   </section>
 
   <footer class="flex gap-2 px-4 py-3 border-t border-gray-200">
-    <input
-      class="flex-1 px-3 py-2 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20"
+    <textarea
+      class="flex-1 px-3 py-2 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
+      rows={3}
       placeholder="Type a message..."
       bind:value={text}
-      on:keydown={(e) => e.key === 'Enter' && send()}
-    />
+      on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
+    ></textarea>
     <button
       class="px-4 py-2 rounded-xl border border-gray-900 bg-gray-900 text-white"
       on:click={send}
