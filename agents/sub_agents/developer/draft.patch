@@ -1,18 +1,18 @@
-diff --git a/web/backend/app.py b/web/backend/app.py
---- a/web/backend/app.py
-+++ b/web/backend/app.py
-@@ -262,6 +262,13 @@
- 
-     await ws.accept()
-     await event_bus.add(ws)
-     lock = asyncio.Lock()
+diff --git a/web/frontend/src/app.css b/web/frontend/src/app.css
+--- a/web/frontend/src/app.css
++++ b/web/frontend/src/app.css
+@@ -1,3 +1,14 @@
+ @tailwind base;
+ @tailwind components;
+ @tailwind utilities;
 +
-+    # Send history for newly opened pages.
-+    try:
-+        await push_session_history(ws, limit=200)
-+    except Exception:
-+        pass
- 
-     async def send(payload: dict[str, Any]) -> None:
-         async with lock:
-             await ws.send_text(json.dumps(payload, ensure_ascii=False))
++@layer components {
++  /* Reduce vertical spacing for markdown blocks rendered by Tailwind Typography. */
++  .prose :where(p, ul, ol, blockquote) {
++    margin-block: 0.6em;
++  }
++
++  .prose :where(pre) {
++    margin-block: 0.8em;
++  }
++}
