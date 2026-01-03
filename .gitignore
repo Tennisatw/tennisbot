@@ -4,6 +4,4 @@ node_modules/
 logs/
 .env
 data/session_summaries/
-data/session.db
-data/session.db-shm
-data/session.db-wal
+data/sessions/

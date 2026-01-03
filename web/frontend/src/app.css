@@ -8,17 +8,15 @@
     margin-block: 0em;
   }
 
-  /* Mobile-friendly code blocks: wrap long lines instead of horizontal scrolling. */
+  /* Wrap long code blocks on mobile to avoid horizontal scrolling. */
   .prose pre {
-    overflow-x: hidden;
     white-space: pre-wrap;
-    overflow-wrap: anywhere;
     word-break: break-word;
+    overflow-x: hidden;
   }
 
-  .prose pre code {
-    white-space: inherit;
-    overflow-wrap: inherit;
-    word-break: inherit;
+  .prose code {
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 }
