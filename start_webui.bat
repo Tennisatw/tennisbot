@@ -9,6 +9,7 @@ cd /d %~dp0
 
 start "tennisbot-web-backend" cmd /k "uv run python -m uvicorn web.backend.app:app --host 0.0.0.0 --port 8000"
 start "tennisbot-web-frontend" cmd /k "cd web\frontend && pnpm install && pnpm dev"
+start "tennisbot-web-browser" "http://127.0.0.1:5173/"
 
 echo [start_web.bat] Started.
 exit /b 0

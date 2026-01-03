@@ -105,3 +105,6 @@
     (经过一番debug之后)
     cd ./web/frontend/
     pnpm install
+
+WebUI基本上开发得差不多了，不过还有一个大bug：http://10.0.0.31:5173/ 发不了消息。明天再说吧。
+此外，传统的CLI还在保留，但渐渐弃用了。

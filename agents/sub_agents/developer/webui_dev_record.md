@@ -175,4 +175,41 @@ Example:
   - Added auto-scroll to bottom after sending.
 - Markdown rendering:
   - Added `marked` + `dompurify` and render assistant messages via `{@html renderMarkdown(...)}`.
-  - Added Tailwind Typography (`@tailwindcss/typography`) and wrapped assistant output with `prose`.
+  - Added Tailwind Typography (`@tailwindcss/typography`) and wrapped assistant output with `prose`.# WebUI Dev Record
+
+## 2026-01-02
+
+### Goal
+- Stream server-side runtime events (tool calls / agent handoffs) to WebUI via WebSocket.
+- Improve WebUI chat rendering (markdown, spacing, typography) and UX.
+
+### Backend changes
+- **`src/logger.py`**
+  - Enhanced `@logged_tool` to emit structured events around tool execution:
+    - `{"type":"tool_call","name":...,"phase":"start"}`
+    - `{"type":"tool_call","name":...,"phase":"end","elapsed_ms":...}`
+    - `{"type":"tool_call","name":...,"phase":"error","elapsed_ms":...,"error":...}`
+  - Added `Logger.emit(payload)` as a structured event emitter (default logs as a single line).
+- **`web/backend/app.py`**
+  - Added an in-process `EventBus` (async queue + broadcast loop) to fan out events to all connected WebSocket clients.
+  - Wired `logger.emit` to `event_bus.publish` so tool/agent events are pushed to the WebUI.
+  - Registered/unregistered WebSocket connections to the bus on connect/disconnect.
+
+### Frontend changes (`web/frontend/src/App.svelte`)
+- **Event rendering**
+  - Added `role: 'meta'` message type.
+  - Rendered `tool_call` events as `meta` lines (not chat bubbles).
+  - Rendered `agent_handoff` events as `meta` lines (e.g. `[handoff] -> <agent>`).
+  - Made `meta` lines bold (`font-semibold`).
+- **Markdown**
+  - Added markdown normalization to reduce excessive blank-line spacing (collapse 3+ newlines to 2).
+  - Enabled markdown rendering for **user** messages too.
+  - Fixed user bubble markdown visibility on dark background using `prose-invert`.
+- **Typography / layout tweaks**
+  - Increased overall font sizes (chat content, input, Send button, status text; title slightly larger).
+  - Reduced markdown line-height using `leading-snug`.
+
+### Notes / follow-ups
+- Theme color experiments were done and later reverted by user.
+- If Pylance complains about assigning to `logger.emit` due to `@dataclass(frozen=True)`, consider switching to `object.__setattr__` or removing `frozen`.
+
