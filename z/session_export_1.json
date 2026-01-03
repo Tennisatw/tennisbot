@@ -1,0 +1,68 @@
+{
+  "db_path": "data\\sessions\\1.db",
+  "session_id": "1",
+  "count": 5,
+  "bad_json": 0,
+  "messages": [
+    {
+      "id": 1,
+      "session_id": "1",
+      "created_at": "2026-01-03 07:53:22",
+      "message_data_raw": "{\"content\": \"\\u8bf7\\u4ea4\\u63a5\\u7ed9developer\\uff0c\\u9605\\u8bfbweb\\u6587\\u4ef6\\u5939\\uff0c\\u7b80\\u4ecb\\u4e4b\", \"role\": \"user\"}",
+      "message_data": {
+        "content": "请交接给developer，阅读web文件夹，简介之",
+        "role": "user"
+      }
+    },
+    {
+      "id": 2,
+      "session_id": "1",
+      "created_at": "2026-01-03 07:53:24",
+      "message_data_raw": "{\"arguments\": \"{}\", \"call_id\": \"call_H4fhSVFjnmTdYJxNv3t64ZOa\", \"name\": \"transfer_to_tennisbot_the_developer\", \"type\": \"function_call\", \"id\": \"fc_001a7872e67ef98e006958caf4926c81969923ae3a5db195f1\", \"status\": \"completed\"}",
+      "message_data": {
+        "arguments": "{}",
+        "call_id": "call_H4fhSVFjnmTdYJxNv3t64ZOa",
+        "name": "transfer_to_tennisbot_the_developer",
+        "type": "function_call",
+        "id": "fc_001a7872e67ef98e006958caf4926c81969923ae3a5db195f1",
+        "status": "completed"
+      }
+    },
+    {
+      "id": 3,
+      "session_id": "1",
+      "created_at": "2026-01-03 07:53:24",
+      "message_data_raw": "{\"call_id\": \"call_H4fhSVFjnmTdYJxNv3t64ZOa\", \"output\": \"{\\\"assistant\\\": \\\"Tennisbot the developer\\\"}\", \"type\": \"function_call_output\"}",
+      "message_data": {
+        "call_id": "call_H4fhSVFjnmTdYJxNv3t64ZOa",
+        "output": "{\"assistant\": \"Tennisbot the developer\"}",
+        "type": "function_call_output"
+      }
+    },
+    {
+      "id": 4,
+      "session_id": "1",
+      "created_at": "2026-01-03 07:53:27",
+      "message_data_raw": "{\"arguments\": \"{\\\"root\\\":\\\"C:\\\\\\\\work\\\\\\\\tennisbot\\\\\\\\web\\\",\\\"ignore\\\":null}\", \"call_id\": \"call_uj3dvWHqiF0R9mSvnKcJsBR8\", \"name\": \"list_files\", \"type\": \"function_call\", \"id\": \"fc_001a7872e67ef98e006958caf6bed4819696abfce53e25b7d1\", \"status\": \"completed\"}",
+      "message_data": {
+        "arguments": "{\"root\":\"C:\\\\work\\\\tennisbot\\\\web\",\"ignore\":null}",
+        "call_id": "call_uj3dvWHqiF0R9mSvnKcJsBR8",
+        "name": "list_files",
+        "type": "function_call",
+        "id": "fc_001a7872e67ef98e006958caf6bed4819696abfce53e25b7d1",
+        "status": "completed"
+      }
+    },
+    {
+      "id": 5,
+      "session_id": "1",
+      "created_at": "2026-01-03 07:53:27",
+      "message_data_raw": "{\"call_id\": \"call_uj3dvWHqiF0R9mSvnKcJsBR8\", \"output\": \"{'success': True, 'name': 'web', 'path': '.', 'type': 'dir', 'children': [{'success': True, 'name': 'backend', 'path': 'backend', 'type': 'dir', 'children': [{'success': True, 'name': 'app.py', 'path': 'backend/app.py', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': '__init__.py', 'path': 'backend/__init__.py', 'type': 'file', 'children': [], 'error': None}], 'error': None}, {'success': True, 'name': 'frontend', 'path': 'frontend', 'type': 'dir', 'children': [{'success': True, 'name': 'index.html', 'path': 'frontend/index.html', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'package.json', 'path': 'frontend/package.json', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'pnpm-lock.yaml', 'path': 'frontend/pnpm-lock.yaml', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'postcss.config.js', 'path': 'frontend/postcss.config.js', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'src', 'path': 'frontend/src', 'type': 'dir', 'children': [{'success': True, 'name': 'app.css', 'path': 'frontend/src/app.css', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'App.svelte', 'path': 'frontend/src/App.svelte', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'main.ts', 'path': 'frontend/src/main.ts', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'vite-env.d.ts', 'path': 'frontend/src/vite-env.d.ts', 'type': 'file', 'children': [], 'error': None}], 'error': None}, {'success': True, 'name': 'tailwind.config.js', 'path': 'frontend/tailwind.config.js', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'tsconfig.json', 'path': 'frontend/tsconfig.json', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'vite.config.ts', 'path': 'frontend/vite.config.ts', 'type': 'file', 'children': [], 'error': None}], 'error': None}], 'error': None}\", \"type\": \"function_call_output\"}",
+      "message_data": {
+        "call_id": "call_uj3dvWHqiF0R9mSvnKcJsBR8",
+        "output": "{'success': True, 'name': 'web', 'path': '.', 'type': 'dir', 'children': [{'success': True, 'name': 'backend', 'path': 'backend', 'type': 'dir', 'children': [{'success': True, 'name': 'app.py', 'path': 'backend/app.py', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': '__init__.py', 'path': 'backend/__init__.py', 'type': 'file', 'children': [], 'error': None}], 'error': None}, {'success': True, 'name': 'frontend', 'path': 'frontend', 'type': 'dir', 'children': [{'success': True, 'name': 'index.html', 'path': 'frontend/index.html', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'package.json', 'path': 'frontend/package.json', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'pnpm-lock.yaml', 'path': 'frontend/pnpm-lock.yaml', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'postcss.config.js', 'path': 'frontend/postcss.config.js', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'src', 'path': 'frontend/src', 'type': 'dir', 'children': [{'success': True, 'name': 'app.css', 'path': 'frontend/src/app.css', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'App.svelte', 'path': 'frontend/src/App.svelte', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'main.ts', 'path': 'frontend/src/main.ts', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'vite-env.d.ts', 'path': 'frontend/src/vite-env.d.ts', 'type': 'file', 'children': [], 'error': None}], 'error': None}, {'success': True, 'name': 'tailwind.config.js', 'path': 'frontend/tailwind.config.js', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'tsconfig.json', 'path': 'frontend/tsconfig.json', 'type': 'file', 'children': [], 'error': None}, {'success': True, 'name': 'vite.config.ts', 'path': 'frontend/vite.config.ts', 'type': 'file', 'children': [], 'error': None}], 'error': None}], 'error': None}",
+        "type": "function_call_output"
+      }
+    }
+  ]
+}

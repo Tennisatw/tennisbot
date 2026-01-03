@@ -108,6 +108,73 @@ def _extract_text(message_data: dict[str, Any]) -> str:
     return ""
 
 
+def _history_events_from_session(*, limit: int = 200) -> list[dict[str, Any]]:
+    """Build frontend-compatible events from stored session messages.
+
+    Notes:
+        - Reads from the same SQLite db used by the WebUI session.
+        - Converts stored agent_messages rows into frontend-compatible WS events.
+        - Includes user/assistant chat, tool calls, and agent handoffs.
+    """
+
+    limit = max(1, min(int(limit), 2000))
+
+    import sqlite3
+
+    conn = sqlite3.connect("data/sessions/1.db", timeout=0.2)
+    try:
+        rows = conn.execute(
+            "SELECT id, message_data FROM agent_messages WHERE session_id=? ORDER BY id ASC LIMIT ?",
+            ("1", limit),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    events: list[dict[str, Any]] = []
+    last_tool_name: str | None = None
+
+    for _id, message_data in rows:
+        try:
+            data = json.loads(message_data)
+        except Exception:
+            continue
+
+        role = data.get("role")
+        if role in ("user", "assistant"):
+            text = _extract_text(data)
+            if not text:
+                continue
+            events.append({"type": "assistant_message" if role == "assistant" else "user_message", "text": text})
+            continue
+
+        msg_type = data.get("type")
+        if msg_type == "function_call":
+            last_tool_name = str(data.get("name") or "tool")
+            events.append({"type": "tool_call", "name": last_tool_name, "phase": "start"})
+            continue
+
+        if msg_type == "function_call_output":
+            events.append({"type": "tool_call", "name": last_tool_name or "tool", "phase": "end"})
+            last_tool_name = None
+            continue
+
+        # Agent SDK currently emits handoffs via logger.emit; keep this for future compatibility.
+        if msg_type == "agent_handoff":
+            to_agent = data.get("to_agent")
+            if isinstance(to_agent, str) and to_agent:
+                events.append({"type": "agent_handoff", "to_agent": to_agent})
+            continue
+
+    return events
+
+
+async def push_session_history(ws: WebSocket, *, limit: int = 200) -> None:
+    """Push session history to a connected WebSocket client."""
+
+    for ev in _history_events_from_session(limit=limit):
+        await ws.send_text(json.dumps(ev, ensure_ascii=False))
+
+
 @app.get("/api/messages")
 async def get_messages(limit: int = 50) -> dict[str, Any]:
     """Return recent chat messages from the single session store."""
@@ -188,6 +255,12 @@ async def ws_endpoint(ws: WebSocket) -> None:
     await ws.accept()
     await event_bus.add(ws)
     lock = asyncio.Lock()
+
+    # Send history for newly opened pages.
+    try:
+        await push_session_history(ws, limit=200)
+    except Exception:
+        pass
 
     async def send(payload: dict[str, Any]) -> None:
         async with lock:

@@ -21,6 +21,8 @@ async def run_python(
     command: str,
 ) -> dict:
     """Execute Python code via exec() in current process
+
+    Note: Avoid using this tool unless absolutely necessary. Please check with user before using.
     Intended for runtime debugging and may contaminate global variables. Use with caution.
 
     Args:

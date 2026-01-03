@@ -25,6 +25,8 @@ async def draft_patch(
     Notes:
         - Do not include the `index ...` line.
         - Avoid malformed hunk headers (e.g. `@@?`), which will be rejected by git.
+        - Avoid creating new files, will be rejected by git.
+        - Failed multiple times -> split into smaller patches.
 
     Args:
         patch (str): Unified diff string.

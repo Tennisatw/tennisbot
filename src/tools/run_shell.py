@@ -12,7 +12,9 @@ async def run_shell(
     cwd: str | None = None,
     timeout_sec: int = 60,
 ) -> dict:
-    """Run a shell command. Use with caution.
+    """Run a shell command.
+
+    Note: Avoid using this tool unless absolutely necessary. Please check with user before using.
 
     Args:
         command: Command string.

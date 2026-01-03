@@ -12,7 +12,9 @@ async def write_file(
     ) -> dict:
     """
     Write the contents to a file.
-    Note: Avoid using this tool unless absolutely necessary. Please check with user before writing to any files.
+
+    Note: Avoid using this tool unless absolutely necessary. Please check with user before using.
+
     Args:
         path (str): Path to the file.
         content (str): Content to write to the file.

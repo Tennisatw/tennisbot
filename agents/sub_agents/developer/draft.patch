@@ -1,19 +1,18 @@
-diff --git a/start_webui.bat b/start_webui.bat
---- a/start_webui.bat
-+++ b/start_webui.bat
-@@ -1,14 +1,15 @@
- @echo off
- setlocal EnableExtensions
+diff --git a/web/backend/app.py b/web/backend/app.py
+--- a/web/backend/app.py
++++ b/web/backend/app.py
+@@ -262,6 +262,13 @@
  
- REM Start Tennisbot Web UI (dev)
- REM - Backend: FastAPI (uvicorn) on http://0.0.0.0:8000
- REM - Frontend: Vite dev server on http://0.0.0.0:5173
+     await ws.accept()
+     await event_bus.add(ws)
+     lock = asyncio.Lock()
++
++    # Send history for newly opened pages.
++    try:
++        await push_session_history(ws, limit=200)
++    except Exception:
++        pass
  
- cd /d %~dp0
- 
- start "tennisbot-web-backend" cmd /k "uv run python -m uvicorn web.backend.app:app --host 0.0.0.0 --port 8000"
- start "tennisbot-web-frontend" cmd /k "cd web\frontend && pnpm install && pnpm dev"
-+start "tennisbot-web-browser" "http://127.0.0.1:5173/"
- 
- echo [start_web.bat] Started.
- exit /b 0
+     async def send(payload: dict[str, Any]) -> None:
+         async with lock:
+             await ws.send_text(json.dumps(payload, ensure_ascii=False))
