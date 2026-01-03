@@ -7,4 +7,18 @@
   .prose :where(p, ul, ol, li, pre, blockquote, h1, h2, h3, h4, h5, h6) {
     margin-block: 0em;
   }
+
+  /* Mobile-friendly code blocks: wrap long lines instead of horizontal scrolling. */
+  .prose pre {
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .prose pre code {
+    white-space: inherit;
+    overflow-wrap: inherit;
+    word-break: inherit;
+  }
 }

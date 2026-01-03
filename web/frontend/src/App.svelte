@@ -8,6 +8,8 @@
   let text = '';
   let messages: { role: 'user' | 'assistant' | 'meta'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
 
+  let messagesEl: HTMLElement | null = null;
+
   let ws: WebSocket | null = null;
 
   marked.setOptions({
@@ -22,6 +24,12 @@
   function renderMarkdown(src: string): string {
     const normalized = normalizeMarkdown(src);
     return DOMPurify.sanitize(marked.parse(normalized) as string);
+  }
+
+  async function scrollToBottom() {
+    await tick();
+    if (!messagesEl) return;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
   function connect() {
@@ -61,10 +69,12 @@
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'assistant', text: msg.text }];
           pendingRuns = Math.max(0, pendingRuns - 1);
+          void scrollToBottom();
           return;
         }
         if (msg.type === 'user_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'user', text: msg.text, status: 'sent' }];
+          void scrollToBottom();
           return;
         }
         if (msg.type === 'error') {
@@ -72,6 +82,7 @@
           const message = typeof msg.message === 'string' ? msg.message : 'unknown_error';
           messages = [...messages, { role: 'assistant', text: `[error] ${message}${detail}` }];
           pendingRuns = Math.max(0, pendingRuns - 1);
+          void scrollToBottom();
           return;
         }
         if (msg.type === 'ack' && typeof msg.message_id === 'string') {
@@ -90,17 +101,18 @@
     const t = text.trim();
     if (!t) return;
 
-    const id = crypto.randomUUID();
+    const id = `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
     messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
     pendingRuns += 1;
     ws.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
     text = '';
+    void scrollToBottom();
   }
 
   connect();
 </script>
 
-<main class="h-screen grid grid-rows-[auto_1fr_auto]">
+<main class="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
   <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
     <div class="text-lg font-semibold">Tennisbot Web UI</div>
     <div class="text-base text-gray-500">
@@ -112,7 +124,7 @@
     </div>
   </header>
 
-  <section class="p-4 overflow-auto bg-gray-50">
+  <section class="p-4 overflow-auto bg-gray-50" bind:this={messagesEl}>
     {#each messages as m}
       {#if m.role === 'meta'}
         <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
@@ -136,13 +148,18 @@
     {/each}
   </section>
 
-  <footer class="flex gap-2 px-4 py-3 border-t border-gray-200">
+  <footer class="sticky bottom-0 flex gap-2 px-4 py-3 border-t border-gray-200 bg-white">
     <textarea
       class="flex-1 px-3 py-2 text-base rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
       rows={3}
       placeholder="Type a message..."
       bind:value={text}
-      on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
+      on:keydown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          send();
+        }
+      }}
     ></textarea>
     <button
       class="px-4 py-2 text-base rounded-xl border border-gray-900 bg-gray-900 text-white"
