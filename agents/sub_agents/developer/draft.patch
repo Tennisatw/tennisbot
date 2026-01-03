@@ -1,18 +1,20 @@
-diff --git a/web/frontend/src/app.css b/web/frontend/src/app.css
---- a/web/frontend/src/app.css
-+++ b/web/frontend/src/app.css
-@@ -1,3 +1,14 @@
- @tailwind base;
- @tailwind components;
- @tailwind utilities;
-+
-+@layer components {
-+  /* Reduce vertical spacing for markdown blocks rendered by Tailwind Typography. */
-+  .prose :where(p, ul, ol, blockquote) {
-+    margin-block: 0.6em;
-+  }
-+
-+  .prose :where(pre) {
-+    margin-block: 0.8em;
-+  }
-+}
+diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
+--- a/web/frontend/src/App.svelte
++++ b/web/frontend/src/App.svelte
+@@ -78,6 +78,10 @@
+         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
+           messages = [...messages, { role: 'assistant', text: msg.text }];
+           pendingRuns = Math.max(0, pendingRuns - 1);
+           return;
+         }
++        if (msg.type === 'user_message' && typeof msg.text === 'string') {
++          messages = [...messages, { role: 'user', text: msg.text, status: 'sent' }];
++          return;
++        }
+         if (msg.type === 'error') {
+           const detail = typeof msg.detail === 'string' ? `\n${msg.detail}` : '';
+           const message = typeof msg.message === 'string' ? msg.message : 'unknown_error';
+           messages = [...messages, { role: 'assistant', text: `[error] ${message}${detail}` }];
+           pendingRuns = Math.max(0, pendingRuns - 1);
+           return;
+         }

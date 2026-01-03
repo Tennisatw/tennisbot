@@ -50,17 +50,12 @@
         if (msg.type === 'tool_call' && typeof msg.name === 'string' && typeof msg.phase === 'string') {
           const name = msg.name;
           const phase = msg.phase;
-          const elapsed = typeof msg.elapsed_ms === 'number' ? ` (${msg.elapsed_ms}ms)` : '';
-          const err = typeof msg.error === 'string' ? `: ${msg.error}` : '';
-
-          const line =
-            phase === 'start'
-              ? `[tool] ${name}...`
-              : phase === 'end'
-                ? `[tool] ${name} done${elapsed}`
-                : `[tool] ${name} error${elapsed}${err}`;
-
-          messages = [...messages, { role: 'meta', text: line }];
+          if (phase === 'end') {
+            messages = [...messages, { role: 'meta', text: `[tool_call] ${name}` }];
+          }
+          if (phase === 'error') {
+            messages = [...messages, { role: 'meta', text: `[tool_call] ${name} error` }];
+          }
           return;
         }
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
