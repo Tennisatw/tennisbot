@@ -9,7 +9,7 @@ set RESTART_COUNT=0
 set WINDOW_START=%TIME%
 
 :loop
-uv run main.py
+uv run CLI_main.py
 
 set EXIT_CODE=%ERRORLEVEL%
 
