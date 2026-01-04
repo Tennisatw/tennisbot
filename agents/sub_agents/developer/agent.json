@@ -6,7 +6,6 @@
         "edit_text_file",
         "grep",
         "run_shell",
-        "run_python",
         "draft_patch",
         "apply_patch",
         "write_file",

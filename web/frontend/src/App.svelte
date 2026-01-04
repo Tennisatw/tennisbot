@@ -2,12 +2,19 @@
   import DOMPurify from 'dompurify';
   import { marked } from 'marked';
 
+  type SessionItem = { session_id: string };
+  let sessions: SessionItem[] = [];
+  let activeSessionId: string | null = null;
+  let isChatActive = true;
+
   let status: 'disconnected' | 'connected' = 'disconnected';
   let pendingRuns = 0;
   let text = '';
   let messages: { role: 'user' | 'assistant' | 'meta'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
 
   let ws: WebSocket | null = null;
+
+  const API_BASE = 'http://localhost:8000';
 
   marked.setOptions({
     gfm: true,
@@ -23,11 +30,87 @@
     return DOMPurify.sanitize(marked.parse(normalized) as string);
   }
 
-  function connect() {
-    if (ws && ws.readyState === WebSocket.OPEN) return;
+  async function refreshSessions(): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions`);
+    const data = await res.json();
+    sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    activeSessionId = typeof data.active_session_id === 'string' ? data.active_session_id : null;
+  }
+
+  async function ensureDefaultSession(): Promise<void> {
+    await refreshSessions();
+    if (sessions.length > 0) return;
+
+    await fetch(`${API_BASE}/api/sessions`, { method: 'POST' });
+    await refreshSessions();
+  }
+
+  async function setActiveSession(sessionId: string): Promise<void> {
+    await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/active`, { method: 'PUT' });
+    activeSessionId = sessionId;
+  }
+
+  function resetChatState(): void {
+    status = 'disconnected';
+    pendingRuns = 0;
+    text = '';
+    messages = [];
+  }
+
+  async function createSession(): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions`, { method: 'POST' });
+    const data = await res.json();
+    const sessionId = typeof data.session_id === 'string' ? data.session_id : null;
+    await refreshSessions();
+    if (!sessionId) return;
+    await switchSession(sessionId);
+  }
+
+  async function switchSession(sessionId: string): Promise<void> {
+    if (activeSessionId === sessionId && ws && ws.readyState === WebSocket.OPEN) return;
+
+    isChatActive = true;
+    resetChatState();
+
+    if (ws) {
+      try {
+        ws.close();
+      } catch {
+        // ignore
+      }
+      ws = null;
+    }
+
+    await setActiveSession(sessionId);
+    connect(sessionId);
+  }
+
+  function endSession(): void {
+    isChatActive = false;
+    resetChatState();
+
+    if (ws) {
+      try {
+        ws.close();
+      } catch {
+        // ignore
+      }
+      ws = null;
+    }
+  }
+
+  function connect(sessionId: string): void {
+    if (ws) {
+      try {
+        ws.close();
+      } catch {
+        // ignore
+      }
+      ws = null;
+    }
 
     const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsUrl = `${wsProto}://${location.hostname}:8000/ws`;
+    const wsUrl = `${wsProto}://${location.hostname}:8000/ws?session_id=${encodeURIComponent(sessionId)}`;
 
     ws = new WebSocket(wsUrl);
     ws.onopen = () => {
@@ -105,58 +188,113 @@
     text = '';
   }
 
-  connect();
+  (async () => {
+    await ensureDefaultSession();
+    if (activeSessionId) {
+      await switchSession(activeSessionId);
+    }
+  })();
 </script>
 
-<main class="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
-  <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-    <div class="text-lg font-semibold">Tennisbot Web UI</div>
-    <div class="text-base text-gray-500">
-      {#if pendingRuns > 0}
-        thinking...
+<main class="min-h-[100dvh] grid grid-cols-[280px_1fr]">
+  <aside class="border-r border-gray-200 bg-white">
+    <div class="px-4 py-3 border-b border-gray-200">
+      <div class="text-lg font-semibold">Tennisbot</div>
+      <div class="text-sm text-gray-500">Sessions</div>
+
+      <button
+        class="mt-3 w-full px-3 py-2 text-sm rounded-lg border border-gray-900 bg-gray-900 text-white"
+        on:click={createSession}
+      >
+        New session
+      </button>
+    </div>
+
+    <div class="p-2 overflow-auto h-[calc(100dvh-57px)]">
+      {#if sessions.length === 0}
+        <div class="px-3 py-2 text-sm text-gray-500">No sessions</div>
       {:else}
-        {status}
+        {#each sessions as s (s.session_id)}
+          <button
+            class={
+              s.session_id === activeSessionId
+                ? 'w-full text-left px-3 py-2 rounded-lg bg-gray-900 text-white'
+                : 'w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-900'
+            }
+            on:click={() => switchSession(s.session_id)}
+          >
+            <div class="text-sm font-medium truncate">{s.session_id}</div>
+          </button>
+        {/each}
       {/if}
     </div>
-  </header>
+  </aside>
 
-  <section class="p-4 pb-28 overflow-auto bg-gray-50">
-    {#each messages as m}
-      {#if m.role === 'meta'}
-        <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
-      {:else}
-      <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
-        <div
-          class={
-            m.role === 'user'
-              ? `max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 whitespace-pre-wrap ${m.status === 'pending' ? 'opacity-60' : ''}`
-              : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
-          }
-        >
-          {#if m.role === 'assistant'}
-            <div class="prose prose-base leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
+  <section class="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
+    <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
+      <div class="text-lg font-semibold">Chat</div>
+      <div class="flex items-center gap-3">
+        <button class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50" on:click={endSession}>
+          End session
+        </button>
+
+        <div class="text-base text-gray-500">
+          {#if pendingRuns > 0}
+            thinking...
           {:else}
-            <div class="prose prose-base prose-invert leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
+            {status}
           {/if}
         </div>
       </div>
-      {/if}
-    {/each}
-  </section>
+    </header>
 
-  <footer class="flex gap-2 px-4 py-3 border-t border-gray-200 bg-white sticky bottom-0">
-    <textarea
-      class="flex-1 px-3 py-2 text-base rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
-      rows={3}
-      placeholder="Type a message..."
-      bind:value={text}
-      on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-    ></textarea>
-    <button
-      class="px-4 py-2 text-base rounded-xl border border-gray-900 bg-gray-900 text-white"
-      on:click={send}
-    >
-      Send
-    </button>
-  </footer>
+    {#if !isChatActive}
+      <div class="p-8 bg-gray-50 h-full">
+        <div class="max-w-[70ch]">
+          <div class="text-2xl font-semibold text-gray-900">No active session</div>
+          <div class="mt-2 text-base text-gray-600">Select a session on the left, or create a new one.</div>
+        </div>
+      </div>
+    {:else}
+      <div class="p-4 pb-28 overflow-auto bg-gray-50">
+        {#each messages as m}
+          {#if m.role === 'meta'}
+            <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
+          {:else}
+            <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
+              <div
+                class={
+                  m.role === 'user'
+                    ? `max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 whitespace-pre-wrap ${m.status === 'pending' ? 'opacity-60' : ''}`
+                    : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
+                }
+              >
+                {#if m.role === 'assistant'}
+                  <div class="prose prose-base leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
+                {:else}
+                  <div class="prose prose-base prose-invert leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        {/each}
+      </div>
+
+      <footer class="flex gap-2 px-4 py-3 border-t border-gray-200 bg-white sticky bottom-0">
+        <textarea
+          class="flex-1 px-3 py-2 text-base rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
+          rows={3}
+          placeholder="Type a message..."
+          bind:value={text}
+          on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
+        ></textarea>
+        <button
+          class="px-4 py-2 text-base rounded-xl border border-gray-900 bg-gray-900 text-white"
+          on:click={send}
+        >
+          Send
+        </button>
+      </footer>
+    {/if}
+  </section>
 </main>

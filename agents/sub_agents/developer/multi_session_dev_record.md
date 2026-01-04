@@ -45,3 +45,14 @@ Turn Tennisbot into multi-session mode:
 - "End session" navigates back to a welcome/blank view on the right; left sidebar remains visible.
 - On startup, treat `data/sessions/*.db` as the source of truth.
   - Rebuild/repair `data/sessions/index.json` by scanning existing DB files.
+
+## Dev log
+- 2026-01-04: Backend: POST /api/sessions now pre-warms an agent bundle via `agents_by_session[session_id] = _new_session_agent()`.
+- 2026-01-04: Backend: `_rebuild_sessions_index()` now preserves `active_session_id` when possible.
+- 2026-01-04: Backend: added `PUT /api/sessions/{session_id}/active` to persist active session in index.json.
+- 2026-01-04: Backend: `GET /api/messages` now accepts optional `session_id` query param.
+
+## Dev log
+- 2026-01-04: Frontend: added sessions sidebar (two-column layout) with session switch via `switchSession(session_id)`.
+- 2026-01-04: Frontend: added "New session" button in sidebar header; calls `POST /api/sessions` then auto-switches.
+- 2026-01-04: Frontend: implemented "End session" (frontend-only): closes WS, clears chat state, and shows a blank/welcome view on the right; selecting a session re-activates chat.

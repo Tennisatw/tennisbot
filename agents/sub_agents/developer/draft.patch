@@ -1,81 +1,14 @@
 diff --git a/web/backend/app.py b/web/backend/app.py
 --- a/web/backend/app.py
 +++ b/web/backend/app.py
-@@ -1,9 +1,10 @@
- import asyncio
- import json
- import os
- import time
- import uuid
- from typing import Any
-+from pathlib import Path
- 
- import dotenv
- from agents import Runner, SQLiteSession
- from fastapi import FastAPI, WebSocket
-@@ -25,6 +26,62 @@
- logger.log("webui.app.start")
- 
- app = FastAPI(title="Tennisbot Web UI")
-+
-+
-+SESSIONS_DIR = Path("data/sessions")
-+SESSIONS_INDEX_PATH = SESSIONS_DIR / "index.json"
-+
-+
-+def _rebuild_sessions_index() -> dict[str, Any]:
-+    """Rebuild sessions index from existing db files.
-+
-+    Notes:
-+        - Treat `data/sessions/*.db` as the source of truth.
-+        - Sort sessions by session_id desc (newest first).
-+    """
-+
-+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-+
-+    session_ids: list[str] = []
-+    for p in SESSIONS_DIR.glob("*.db"):
-+        sid = p.stem
-+        if sid.isdigit():
-+            session_ids.append(sid)
-+
-+    session_ids.sort(reverse=True)
-+    index: dict[str, Any] = {
-+        "sessions": [{"session_id": sid} for sid in session_ids],
-+        "active_session_id": session_ids[0] if session_ids else None,
-+    }
-+
-+    tmp_path = SESSIONS_INDEX_PATH.with_suffix(".json.tmp")
-+    tmp_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
-+    tmp_path.replace(SESSIONS_INDEX_PATH)
-+    return index
-+
-+
-+def _load_sessions_index() -> dict[str, Any]:
-+    """Load sessions index, rebuilding it if missing or invalid."""
-+
-+    try:
-+        raw = SESSIONS_INDEX_PATH.read_text(encoding="utf-8")
-+        data = json.loads(raw)
-+        if not isinstance(data, dict):
-+            raise ValueError("index_not_dict")
-+        if not isinstance(data.get("sessions"), list):
-+            raise ValueError("sessions_not_list")
-+        return data
-+    except Exception:
-+        return _rebuild_sessions_index()
- 
- 
- class EventBus:
-     """Async event bus for pushing server-side events to WebSocket clients."""
-@@ -90,6 +147,10 @@
- @app.on_event("startup")
- async def _startup() -> None:
-     asyncio.create_task(event_bus.run())
-+    # Ensure sessions index exists.
-+    # This also repairs it after manual deletion of db files.
-+    _load_sessions_index()
- 
- 
- def _extract_text(message_data: dict[str, Any]) -> str:
-     """Extract plain text from a stored agent message."""
+@@ -398,6 +398,7 @@
+ app.add_middleware(
+     CORSMiddleware,
+     allow_origins=[
+         "http://localhost:5173",
++        "http://127.0.0.1:5173",
+     ],
+     allow_credentials=True,
+     allow_methods=["*"],
+     allow_headers=["*"],
+ )

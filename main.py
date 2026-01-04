@@ -30,7 +30,7 @@ if __name__ == "__main__":
             agent.handoffs = [create_handoff_obj(sub_agent) for sub_agent in agents_list]
 
             # Create a session
-            session = SQLiteSession("0", db_path="data/sessions/0.db")
+            session = SQLiteSession("0", db_path="data/sessions/1.db")
             # For multi-session (reserved)
             # datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             # session = SQLiteSession("0", db_path=f"data/sessions/{datetime_str}.db")
@@ -43,7 +43,7 @@ if __name__ == "__main__":
             # Raised by archive_session tool
             if e.code == 94: # Start a new session
                 logger.log("app.start_new_session")
-                session_cleanup(session_path="data/sessions/0.db")
+                session_cleanup(session_path="data/sessions/1.db")
 
             # Raised by request_restart tool
             elif e.code == 95: # Exit application
