@@ -1,16 +1,170 @@
 diff --git a/web/backend/app.py b/web/backend/app.py
+index 2d3d6f1..9a1b2c3 100644
 --- a/web/backend/app.py
 +++ b/web/backend/app.py
-@@ -13,7 +13,7 @@
- from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
- from src.settings import settings
--from src.logger import logger
-+from src.logger import current_session_id, logger
-@@ -438,6 +438,7 @@
-     lock = asyncio.Lock()
+@@ -4,9 +4,8 @@
+ import os
+ import time
+ import uuid
+ from typing import Any
+-from pathlib import Path
  
-     # Scope logger.emit to this session.
-     _old_emit = logger.emit
-     logger.emit = lambda p: _old_emit({**p, "session_id": session_id})
-+
-+    token = current_session_id.set(session_id)
+ import dotenv
+ from agents import Runner, SQLiteSession
+ from fastapi import FastAPI, WebSocket
+ from fastapi.middleware.cors import CORSMiddleware
+ 
+ from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
++from src.sessions_index import SESSIONS_DIR, create_session as create_session_store, ensure_session_db, load_sessions_index, rebuild_sessions_index, set_active_session_id
+ from src.settings import settings
+ from src.logger import current_session_id, logger
+@@ -22,91 +21,6 @@
+ 
+ app = FastAPI(title="Tennisbot Web UI")
+ 
+-
+-SESSIONS_DIR = Path("data/sessions")
+-SESSIONS_INDEX_PATH = SESSIONS_DIR / "index.json"
+-
+-
+-def _rebuild_sessions_index() -> dict[str, Any]:
+-    """Rebuild sessions index from existing db files.
+-
+-    Notes:
+-        - Treat `data/sessions/*.db` as the source of truth.
+-        - Sort sessions by session_id desc (newest first).
+-        - Preserve active_session_id when possible.
+-    """
+-
+-    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+-
+-    prev_active: str | None = None
+-    try:
+-        raw = SESSIONS_INDEX_PATH.read_text(encoding="utf-8")
+-        data = json.loads(raw)
+-        if isinstance(data, dict):
+-            active = data.get("active_session_id")
+-            if isinstance(active, str) and active.isdigit():
+-                prev_active = active
+-    except Exception:
+-        prev_active = None
+-
+-    session_ids: list[str] = []
+-    for p in SESSIONS_DIR.glob("*.db"):
+-        sid = p.stem
+-        if sid.isdigit():
+-            session_ids.append(sid)
+-
+-    session_ids.sort(reverse=True)
+-
+-    active_session_id: str | None = None
+-    if prev_active is not None and prev_active in session_ids:
+-        active_session_id = prev_active
+-    elif session_ids:
+-        active_session_id = session_ids[0]
+-
+-    index: dict[str, Any] = {
+-        "sessions": [{"session_id": sid} for sid in session_ids],
+-        "active_session_id": active_session_id,
+-    }
+-
+-    tmp_path = SESSIONS_INDEX_PATH.with_suffix(".json.tmp")
+-    tmp_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+-    tmp_path.replace(SESSIONS_INDEX_PATH)
+-    return index
+-
+-
+-def _load_sessions_index() -> dict[str, Any]:
+-    """Load sessions index, rebuilding it if missing or invalid."""
+-
+-    try:
+-        raw = SESSIONS_INDEX_PATH.read_text(encoding="utf-8")
+-        data = json.loads(raw)
+-        if not isinstance(data, dict):
+-            raise ValueError("index_not_dict")
+-        if not isinstance(data.get("sessions"), list):
+-            raise ValueError("sessions_not_list")
+-        return data
+-    except Exception:
+-        return _rebuild_sessions_index()
+-
+@@ -189,7 +103,7 @@
+ async def _startup() -> None:
+     asyncio.create_task(event_bus.run())
+     # Ensure sessions index exists.
+     # This also repairs it after manual deletion of db files.
+-    _load_sessions_index()
++    load_sessions_index()
+@@ -278,7 +192,7 @@
+ async def list_sessions() -> dict[str, Any]:
+@@
+-    index = _rebuild_sessions_index()
++    index = rebuild_sessions_index()
+     return {"sessions": index.get("sessions", []), "active_session_id": index.get("active_session_id")}
+@@ -304,16 +218,12 @@
+ async def set_active_session(session_id: str) -> dict[str, Any]:
+@@
+-    if not session_id.isdigit():
+-        return {"ok": False, "error": "invalid_session_id"}
+-
+-    db_path = SESSIONS_DIR / f"{session_id}.db"
+-    if not db_path.exists():
+-        return {"ok": False, "error": "session_db_missing"}
+-
+-    index = _rebuild_sessions_index()
+-    index["active_session_id"] = session_id
+-    tmp_path = SESSIONS_INDEX_PATH.with_suffix(".json.tmp")
+-    tmp_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+-    tmp_path.replace(SESSIONS_INDEX_PATH)
+-    return {"ok": True, "active_session_id": session_id}
++    try:
++        index = set_active_session_id(session_id)
++    except ValueError:
++        return {"ok": False, "error": "invalid_session_id"}
++    except FileNotFoundError:
++        return {"ok": False, "error": "session_db_missing"}
++    return {"ok": True, "active_session_id": index.get("active_session_id")}
+@@ -332,26 +242,14 @@
+ async def create_session() -> dict[str, Any]:
+@@
+-    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+-
+-    session_id = str(int(time.time() * 1000))
+-    db_path = SESSIONS_DIR / f"{session_id}.db"
+-    if not db_path.exists():
+-        # Touch the file so it appears in the index immediately.
+-        # SQLiteSession will create tables lazily on first use.
+-        db_path.write_bytes(b"")
+-
+-    index = _rebuild_sessions_index()
+-    index["active_session_id"] = session_id
+-    tmp_path = SESSIONS_INDEX_PATH.with_suffix(".json.tmp")
+-    tmp_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+-    tmp_path.replace(SESSIONS_INDEX_PATH)
+-
+-    # Pre-warm agent bundle for the new session.
+-    agents_by_session[session_id] = _new_session_agent()
+-
+-    return {"session_id": session_id, "db_path": str(db_path)}
++    created = create_session_store()
++    session_id = created["session_id"]
++    # Pre-warm agent bundle for the new session.
++    agents_by_session[session_id] = _new_session_agent()
++    return created
+@@ -373,7 +271,7 @@
+ async def get_messages(limit: int = 50, session_id: str | None = None) -> dict[str, Any]:
+@@
+     if session_id is None:
+-        session_id = _load_sessions_index().get("active_session_id")
++        session_id = load_sessions_index().get("active_session_id")
+@@ -452,15 +350,7 @@
+ async def ws_endpoint(ws: WebSocket) -> None:
+@@
+-    session_id = ws.query_params.get("session_id")
+-    if not isinstance(session_id, str) or not session_id.isdigit():
+-        session_id = _load_sessions_index().get("active_session_id")
+-    if not isinstance(session_id, str) or not session_id.isdigit():
+-        session_id = str(int(time.time() * 1000))
+-        (SESSIONS_DIR / f"{session_id}.db").write_bytes(b"")
+-        _rebuild_sessions_index()
++    session_id = ensure_session_db(ws.query_params.get("session_id"))

@@ -1,10 +1,12 @@
+# CLI 模式的主程序入口
+
 import asyncio
 import dotenv
 import datetime
 
 from agents import SQLiteSession
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
-from src.run_session import run_session, session_cleanup
+from src.CLI_run_session import run_session, session_cleanup
 from src.logger import logger
 
 
@@ -16,10 +18,6 @@ if __name__ == "__main__":
 
     logger.setup()
     logger.log("app.start")
-
-    # TODO: load schedule tasks
-
-    # TODO: load GUI
 
     while True:
         try:
@@ -52,5 +50,3 @@ if __name__ == "__main__":
             elif e.code == 96: # Restart application
                 logger.log(f"app.restart")
                 raise e
-
-    # TODO: 允许多开session

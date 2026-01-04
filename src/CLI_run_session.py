@@ -1,3 +1,5 @@
+# CLI 模式的会话运行器
+
 import os
 import sqlite3
 import time
