@@ -27,6 +27,8 @@ draft_patch 连续失败 10 次则暂停，等待用户指示
     agent加载：src/load_agent.py
     logger相关：src/logger.py
     运行会话相关：src/run_session.py
+    WebUI session/index：src/sessions_index.py
+    WebUI history/messages：src/session_history.py（计划拆分；当前仍在 web/backend/app.py）
     工具实现：src/tools/<toolname>.py
 
 Agent 相关（agents/）：
@@ -41,6 +43,7 @@ Agent 相关（agents/）：
     app配置：data/setting.json
     定时/周期性任务记录：data/schedule.json
     当前会话文件：data/sessions/1.db
+    WebUI sessions index：data/sessions/index.json
 
 WebUI 相关（web/）：
     前端代码：web/frontend/
@@ -48,6 +51,7 @@ WebUI 相关（web/）：
         UI：web/frontend/src/App.svelte
     后端代码：web/backend/
         入口：web/backend/app.py (FastAPI)
+        说明：app.py 负责 FastAPI 路由/WS；sessions index 逻辑已迁移到 src/sessions_index.py
 
 程序运行记录：logs/yyyy-mm-dd.log
 

@@ -22,3 +22,9 @@ whitespace-pre-wrap {
 禁用。
 
 可以配套增加行距。
+
+<br>
+
+draft/apply patch 有点太麻烦了。
+
+我可以自己约定一个简单的。
