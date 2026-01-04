@@ -28,7 +28,7 @@ draft_patch 连续失败 10 次则暂停，等待用户指示
     logger相关：src/logger.py
     运行会话相关：src/run_session.py
     WebUI session/index：src/sessions_index.py
-    WebUI history/messages：src/session_history.py（计划拆分；当前仍在 web/backend/app.py）
+    WebUI history/messages：src/session_history.py
     工具实现：src/tools/<toolname>.py
 
 Agent 相关（agents/）：
@@ -51,7 +51,7 @@ WebUI 相关（web/）：
         UI：web/frontend/src/App.svelte
     后端代码：web/backend/
         入口：web/backend/app.py (FastAPI)
-        说明：app.py 负责 FastAPI 路由/WS；sessions index 逻辑已迁移到 src/sessions_index.py
+        说明：app.py 负责 FastAPI 路由/WS；sessions index 逻辑在 src/sessions_index.py；history/messages 逻辑在 src/session_history.py
 
 程序运行记录：logs/yyyy-mm-dd.log
 

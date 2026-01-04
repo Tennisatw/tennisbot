@@ -2,13 +2,6 @@
 
 <br>
 
-Chat
-End session
-connected
-这三个现在会滚上去
-
-<br>
-
 实现语音（可以先从tts和语音转文字开始）
 
 <br>

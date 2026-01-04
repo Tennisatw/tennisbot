@@ -1,29 +1,53 @@
-diff --git a/web/backend/app.py b/web/backend/app.py
-index 3c4d5e6..4d5e6f7 100644
---- a/web/backend/app.py
-+++ b/web/backend/app.py
-@@ -78,27 +78,0 @@
--
--
--def _extract_text(message_data: dict[str, Any]) -> str:
--    """Extract plain text from a stored agent message."""
--
--    content = message_data.get("content")
--    if isinstance(content, str):
--        return content
--
--    if isinstance(content, list):
--        parts: list[str] = []
--        for item in content:
--            if not isinstance(item, dict):
--                continue
--            text = item.get("text")
--            if isinstance(text, str):
--                parts.append(text)
--        return "".join(parts)
--
--    return ""
--
--
- def _history_events_from_session(*, session_id: str, limit: int = 200) -> list[dict[str, Any]]:
-     """Build frontend-compatible events from stored session messages.
+diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
+--- a/web/frontend/src/App.svelte
++++ b/web/frontend/src/App.svelte
+@@ -112,7 +112,7 @@
+ </script>
+ 
+-<main class="min-h-[100dvh] grid grid-cols-[280px_1fr]">
++<main class="h-[100dvh] grid grid-cols-[280px_1fr] overflow-hidden">
+   <aside class="border-r border-gray-200 bg-white grid grid-rows-[auto_1fr] min-h-[100dvh]">
+     <div class="px-4 py-3 border-b border-gray-200">
+       <div class="text-lg font-semibold">Tennisbot</div>
+       <div class="text-sm text-gray-500">Sessions</div>
+@@ -149,7 +149,7 @@
+     </div>
+   </aside>
+ 
+-  <section class="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
++  <section class="grid grid-rows-[auto_1fr_auto] min-h-0">
+     <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
+       <div class="text-lg font-semibold">Chat</div>
+       <div class="flex items-center gap-3">
+         <button class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50" on:click={endSession}>
+           End session
+         </button>
+@@ -176,7 +176,7 @@
+         </div>
+       </div>
+     {:else}
+-      <div class="p-4 pb-28 overflow-auto bg-gray-50">
++      <div class="p-4 pb-28 overflow-auto bg-gray-50 min-h-0">
+         {#each messages as m}
+           {#if m.role === 'meta'}
+             <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
+           {:else}
+             <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
+               <div
+                 class={
+                   m.role === 'user'
+                     ? `max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 whitespace-pre-wrap ${m.status === 'pending' ? 'opacity-60' : ''}`
+                     : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
+                 }
+               >
+                 {#if m.role === 'assistant'}
+                   <div class="prose prose-base leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
+                 {:else}
+                   <div class="prose prose-base prose-invert leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
+                 {/if}
+               </div>
+             </div>
+           {/if}
+         {/each}
+       </div>
+*** End Patch

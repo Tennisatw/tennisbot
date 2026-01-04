@@ -196,8 +196,8 @@
   })();
 </script>
 
-<main class="min-h-[100dvh] grid grid-cols-[280px_1fr]">
-  <aside class="border-r border-gray-200 bg-white">
+<main class="h-[100dvh] grid grid-cols-[280px_1fr] overflow-hidden">
+  <aside class="border-r border-gray-200 bg-white grid grid-rows-[auto_1fr] min-h-[100dvh]">
     <div class="px-4 py-3 border-b border-gray-200">
       <div class="text-lg font-semibold">Tennisbot</div>
       <div class="text-sm text-gray-500">Sessions</div>
@@ -210,7 +210,7 @@
       </button>
     </div>
 
-    <div class="p-2 overflow-auto h-[calc(100dvh-57px)]">
+    <div class="p-2 overflow-auto min-h-0">
       {#if sessions.length === 0}
         <div class="px-3 py-2 text-sm text-gray-500">No sessions</div>
       {:else}
@@ -230,7 +230,7 @@
     </div>
   </aside>
 
-  <section class="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
+  <section class="grid grid-rows-[auto_1fr_auto] min-h-0">
     <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
       <div class="text-lg font-semibold">Chat</div>
       <div class="flex items-center gap-3">
@@ -256,7 +256,7 @@
         </div>
       </div>
     {:else}
-      <div class="p-4 pb-28 overflow-auto bg-gray-50">
+      <div class="p-4 pb-28 overflow-auto bg-gray-50 min-h-0">
         {#each messages as m}
           {#if m.role === 'meta'}
             <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
