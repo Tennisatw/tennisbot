@@ -1,3 +1,5 @@
+# 有点鸡肋的功能。首先，所有run_python能做的工作，都可以run_shell完成。其次，本功能很危险。
+
 import sys
 
 from agents import function_tool

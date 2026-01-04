@@ -12,7 +12,7 @@ doc string与代码注释：使用简洁明确的英文
 代码修改流程：先用 draft_patch 产出1个 git-style patch，再用 apply_patch 应用
 draft_patch 连续失败 10 次则暂停，等待用户指示
 每次只生成1个patch，每个patch只改动一个地方。
-执行 apply_patch / write_file / run_shell / run_python 前先征得用户确认；其他操作不需要确认
+执行 apply_patch / write_file / run_shell 前先征得用户确认。使用其他工具不需确认
 对于大型的项目，使用 edit_text_file 工具维护一个备忘录 (agents/sub_agents/developer/xxx_notes.md) 记录计划，过程，思考等
 
 除非用户要求，不要交接给刚刚交接回来的 agent

@@ -25,7 +25,6 @@ async def draft_patch(
     Notes:
         - Do not include the `index ...` line.
         - Avoid malformed hunk headers (e.g. `@@?`), which will be rejected by git.
-        - Avoid creating new files, will be rejected by git.
         - Failed multiple times -> split into smaller patches.
 
     Args:
@@ -41,13 +40,32 @@ async def draft_patch(
 
     Git-style unified patch example:
 ```
-diff --git a/agents/sub_agents/developer/template.txt b/agents/sub_agents/developer/template.txt
---- a/agents/sub_agents/developer/template.txt
-+++ b/agents/sub_agents/developer/template.txt
-@@ -1,2 +1,3 @@
- Hello Tennisbot
- Love from Tennisatw
-+Hello world
+diff --git a/test.md b/test.md
+new file mode 100644
+index 0000000..8b13789
+--- /dev/null
++++ b/test.md
+@@ -0,0 +1,5 @@
++# Test File
++
++Hello World
++
++End of file.
+
+```
+```
+diff --git a/test.md b/test.md
+index 8b13789..c0ffee0 100644
+--- a/test.md
++++ b/test.md
+@@ -1,5 +1,5 @@
+ # Test File
+ 
+-Hello World
++Hello Tennisbot
+ 
+ End of file.
+
 ```
     """
 

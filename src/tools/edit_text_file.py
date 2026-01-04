@@ -12,7 +12,8 @@ async def edit_text_file(
     mode: str = "a"
     ) -> dict:
     """
-    Append the contents to a file. Can only be used on .txt, and .md files.
+    Append/Overwrite the contents to a text file, used for maintaining memos, generating reports, etc.
+    Can only edit .txt, and .md files. 
     Args:
         path (str): Path to the file.
         content (str): Content to write to the file.

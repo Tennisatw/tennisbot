@@ -1,35 +1,81 @@
-diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
---- a/web/frontend/src/App.svelte
-+++ b/web/frontend/src/App.svelte
-@@ -154,7 +154,7 @@
+diff --git a/web/backend/app.py b/web/backend/app.py
+--- a/web/backend/app.py
++++ b/web/backend/app.py
+@@ -1,9 +1,10 @@
+ import asyncio
+ import json
+ import os
+ import time
+ import uuid
+ from typing import Any
++from pathlib import Path
  
-   connect();
- </script>
+ import dotenv
+ from agents import Runner, SQLiteSession
+ from fastapi import FastAPI, WebSocket
+@@ -25,6 +26,62 @@
+ logger.log("webui.app.start")
  
--<main class="h-screen grid grid-rows-[auto_1fr_auto]">
-+<main class="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
-   <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-     <div class="text-lg font-semibold">Tennisbot Web UI</div>
-     <div class="text-base text-gray-500">
-       {#if pendingRuns > 0}
-@@ -168,7 +168,7 @@
-     </div>
-   </header>
+ app = FastAPI(title="Tennisbot Web UI")
++
++
++SESSIONS_DIR = Path("data/sessions")
++SESSIONS_INDEX_PATH = SESSIONS_DIR / "index.json"
++
++
++def _rebuild_sessions_index() -> dict[str, Any]:
++    """Rebuild sessions index from existing db files.
++
++    Notes:
++        - Treat `data/sessions/*.db` as the source of truth.
++        - Sort sessions by session_id desc (newest first).
++    """
++
++    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
++
++    session_ids: list[str] = []
++    for p in SESSIONS_DIR.glob("*.db"):
++        sid = p.stem
++        if sid.isdigit():
++            session_ids.append(sid)
++
++    session_ids.sort(reverse=True)
++    index: dict[str, Any] = {
++        "sessions": [{"session_id": sid} for sid in session_ids],
++        "active_session_id": session_ids[0] if session_ids else None,
++    }
++
++    tmp_path = SESSIONS_INDEX_PATH.with_suffix(".json.tmp")
++    tmp_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
++    tmp_path.replace(SESSIONS_INDEX_PATH)
++    return index
++
++
++def _load_sessions_index() -> dict[str, Any]:
++    """Load sessions index, rebuilding it if missing or invalid."""
++
++    try:
++        raw = SESSIONS_INDEX_PATH.read_text(encoding="utf-8")
++        data = json.loads(raw)
++        if not isinstance(data, dict):
++            raise ValueError("index_not_dict")
++        if not isinstance(data.get("sessions"), list):
++            raise ValueError("sessions_not_list")
++        return data
++    except Exception:
++        return _rebuild_sessions_index()
  
--  <section class="p-4 overflow-auto bg-gray-50">
-+  <section class="p-4 pb-28 overflow-auto bg-gray-50">
-     {#each messages as m}
-       {#if m.role === 'meta'}
-         <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
-       {:else}
-@@ -191,7 +191,7 @@
-       {/if}
-     {/each}
-   </section>
  
--  <footer class="flex gap-2 px-4 py-3 border-t border-gray-200">
-+  <footer class="flex gap-2 px-4 py-3 border-t border-gray-200 bg-white sticky bottom-0">
-     <textarea
-       class="flex-1 px-3 py-2 text-base rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
-       rows={3}
-       placeholder="Type a message..."
+ class EventBus:
+     """Async event bus for pushing server-side events to WebSocket clients."""
+@@ -90,6 +147,10 @@
+ @app.on_event("startup")
+ async def _startup() -> None:
+     asyncio.create_task(event_bus.run())
++    # Ensure sessions index exists.
++    # This also repairs it after manual deletion of db files.
++    _load_sessions_index()
+ 
+ 
+ def _extract_text(message_data: dict[str, Any]) -> str:
+     """Extract plain text from a stored agent message."""
