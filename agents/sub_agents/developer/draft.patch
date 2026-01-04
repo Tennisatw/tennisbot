@@ -1,14 +1,16 @@
 diff --git a/web/backend/app.py b/web/backend/app.py
 --- a/web/backend/app.py
 +++ b/web/backend/app.py
-@@ -398,6 +398,7 @@
- app.add_middleware(
-     CORSMiddleware,
-     allow_origins=[
-         "http://localhost:5173",
-+        "http://127.0.0.1:5173",
-     ],
-     allow_credentials=True,
-     allow_methods=["*"],
-     allow_headers=["*"],
- )
+@@ -13,7 +13,7 @@
+ from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
+ from src.settings import settings
+-from src.logger import logger
++from src.logger import current_session_id, logger
+@@ -438,6 +438,7 @@
+     lock = asyncio.Lock()
+ 
+     # Scope logger.emit to this session.
+     _old_emit = logger.emit
+     logger.emit = lambda p: _old_emit({**p, "session_id": session_id})
++
++    token = current_session_id.set(session_id)

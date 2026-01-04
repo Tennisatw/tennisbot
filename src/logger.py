@@ -1,10 +1,15 @@
 import time
 import logging
+import contextvars
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
+
+current_session_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "current_session_id", default=None
+)
 
 
 def _normalize_value(v, *, max_len: int | None = 100):
@@ -133,6 +138,10 @@ class Logger:
             - Default behavior is to log it as a single line.
             - Web backends may monkey-patch this method to forward events.
         """
+
+        sid = current_session_id.get()
+        if isinstance(sid, str) and sid.isdigit() and "session_id" not in payload:
+            payload = {**payload, "session_id": sid}
 
         self.log(f"event {payload}")
 

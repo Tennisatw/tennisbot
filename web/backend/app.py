@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 from src.settings import settings
-from src.logger import logger
+from src.logger import current_session_id, logger
 
 
 dotenv.load_dotenv()
@@ -434,17 +434,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
     await event_bus.add(ws, session_id=session_id)
     lock = asyncio.Lock()
 
-    # Scope logger.emit to this session.
-    _old_emit = logger.emit
-    logger.emit = lambda p: _old_emit({**p, "session_id": session_id})
-
-    # Send history for newly opened pages.
-    if not isinstance(session_id, str) or not session_id.isdigit():
-        session_id = _load_sessions_index().get("active_session_id")
-    if not isinstance(session_id, str) or not session_id.isdigit():
-        session_id = str(int(time.time() * 1000))
-        (SESSIONS_DIR / f"{session_id}.db").write_bytes(b"")
-        _rebuild_sessions_index()
+    token = current_session_id.set(session_id)
 
     try:
         await push_session_history(ws, session_id=session_id, limit=200)
@@ -460,7 +450,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
             raw = await ws.receive_text()
         except Exception:
             await event_bus.remove(ws)
-            logger.emit = _old_emit
+            current_session_id.reset(token)
             return
 
         try:
