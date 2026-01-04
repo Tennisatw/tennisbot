@@ -259,14 +259,14 @@
       <div class="p-4 pb-28 overflow-auto bg-gray-50 min-h-0">
         {#each messages as m}
           {#if m.role === 'meta'}
-            <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
+            <div class="my-1 text-base font-semibold text-gray-600">{m.text}</div>
           {:else}
             <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
               <div
                 class={
                   m.role === 'user'
-                    ? `max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 whitespace-pre-wrap ${m.status === 'pending' ? 'opacity-60' : ''}`
-                    : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
+                    ? `max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 ${m.status === 'pending' ? 'opacity-60' : ''}`
+                    : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200'
                 }
               >
                 {#if m.role === 'assistant'}

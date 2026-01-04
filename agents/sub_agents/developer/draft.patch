@@ -1,53 +1,27 @@
-diff --git a/web/frontend/src/App.svelte b/web/frontend/src/App.svelte
---- a/web/frontend/src/App.svelte
-+++ b/web/frontend/src/App.svelte
-@@ -112,7 +112,7 @@
- </script>
+diff --git a/web/frontend/src/app.css b/web/frontend/src/app.css
+--- a/web/frontend/src/app.css
++++ b/web/frontend/src/app.css
+@@ -1,21 +1,21 @@
+ @tailwind base;
+ @tailwind components;
+ @tailwind utilities;
  
--<main class="min-h-[100dvh] grid grid-cols-[280px_1fr]">
-+<main class="h-[100dvh] grid grid-cols-[280px_1fr] overflow-hidden">
-   <aside class="border-r border-gray-200 bg-white grid grid-rows-[auto_1fr] min-h-[100dvh]">
-     <div class="px-4 py-3 border-b border-gray-200">
-       <div class="text-lg font-semibold">Tennisbot</div>
-       <div class="text-sm text-gray-500">Sessions</div>
-@@ -149,7 +149,7 @@
-     </div>
-   </aside>
+ @layer components {
+   /* Reduce vertical spacing for markdown blocks rendered by Tailwind Typography. */
+   .prose :where(p, ul, ol, li, pre, blockquote, h1, h2, h3, h4, h5, h6) {
+-    margin-block: 0em;
++    margin-block: 0.35em;
+   }
  
--  <section class="min-h-[100dvh] grid grid-rows-[auto_1fr_auto]">
-+  <section class="grid grid-rows-[auto_1fr_auto] min-h-0">
-     <header class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
-       <div class="text-lg font-semibold">Chat</div>
-       <div class="flex items-center gap-3">
-         <button class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50" on:click={endSession}>
-           End session
-         </button>
-@@ -176,7 +176,7 @@
-         </div>
-       </div>
-     {:else}
--      <div class="p-4 pb-28 overflow-auto bg-gray-50">
-+      <div class="p-4 pb-28 overflow-auto bg-gray-50 min-h-0">
-         {#each messages as m}
-           {#if m.role === 'meta'}
-             <div class="my-1 text-base font-semibold text-gray-600 whitespace-pre-wrap">{m.text}</div>
-           {:else}
-             <div class={m.role === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2'}>
-               <div
-                 class={
-                   m.role === 'user'
-                     ? `max-w-[70ch] px-3 py-2 rounded-xl bg-gray-900 text-white border border-gray-900 whitespace-pre-wrap ${m.status === 'pending' ? 'opacity-60' : ''}`
-                     : 'max-w-[70ch] px-3 py-2 rounded-xl bg-white text-gray-900 border border-gray-200 whitespace-pre-wrap'
-                 }
-               >
-                 {#if m.role === 'assistant'}
-                   <div class="prose prose-base leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
-                 {:else}
-                   <div class="prose prose-base prose-invert leading-snug max-w-none">{@html renderMarkdown(m.text)}</div>
-                 {/if}
-               </div>
-             </div>
-           {/if}
-         {/each}
-       </div>
-*** End Patch
+   /* Wrap long code blocks on mobile to avoid horizontal scrolling. */
+   .prose pre {
+     white-space: pre-wrap;
+     word-break: break-word;
+     overflow-x: hidden;
+   }
+ 
+   .prose code {
+     white-space: pre-wrap;
+     word-break: break-word;
+   }
+ }
