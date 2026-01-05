@@ -12,7 +12,7 @@ async def edit_text_file(
     mode: str = "a"
     ) -> dict:
     """
-    Append/Overwrite the contents to a text file, used for maintaining memos, generating reports, etc.
+    Append/Overwrite the contents to a text file. This tool provide a simple way for maintaining memos, generating reports, etc.
     Can only edit .txt, and .md files. 
     Args:
         path (str): Path to the file.

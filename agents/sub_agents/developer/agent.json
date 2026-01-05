@@ -4,12 +4,11 @@
         "list_files",
         "read_file",
         "edit_text_file",
+        "edit_apply",
         "grep",
+        "openai:WebSearchTool",
         "run_shell",
-        "draft_patch",
-        "apply_patch",
-        "write_file",
-        "openai:WebSearchTool"
+        "write_file"
     ],
     "temperature": 0.5,
     "handoff_description": "To complete tasks related to project and code recommendations, modifications, and development."

@@ -115,4 +115,16 @@ WebUI基本上开发得差不多了，不过还有一个大bug：http://10.0.0.3
 
 给WebUI debug
 升级成 multi-session
-弃用一些tools：run_python，
+弃用一些tools：run_python
+
+<br>
+
+2026.01.04:
+
+支持多 session
+
+<br>
+
+2026.01.05:
+
+新增 edit_apply 工具，弃用 draft_patch 和 apply_patch 工具，因为失败率高。

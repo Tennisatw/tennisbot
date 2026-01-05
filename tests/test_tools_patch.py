@@ -10,8 +10,8 @@ import pytest
 # Ensure repo root is importable so `import src...` works under pytest/uv on Windows
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.tools.apply_patch import apply_patch
-from src.tools.draft_patch import draft_patch
+from tools._apply_patch import apply_patch
+from tools._draft_patch import draft_patch
 
 
 @pytest.mark.asyncio
