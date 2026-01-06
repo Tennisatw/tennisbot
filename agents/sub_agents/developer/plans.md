@@ -6,12 +6,6 @@
 
 <br>
 
-draft/apply patch 有点太麻烦了。
-
-我可以自己约定一个简单的。
-
-<br>
-
 Access to fetch at 'http://localhost:8000/api/sessions' from origin 'http://10.0.0.31:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 localhost:8000/api/sessions:1 
  Failed to load resource: net::ERR_FAILED

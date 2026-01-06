@@ -2,11 +2,10 @@
 
 import asyncio
 import dotenv
-import datetime
 
 from agents import SQLiteSession
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
-from src.CLI_run_session import run_session, session_cleanup
+from src.cli_run_session import run_session, session_cleanup
 from src.logger import logger
 
 
