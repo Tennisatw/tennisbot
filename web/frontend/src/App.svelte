@@ -48,7 +48,11 @@
   }
 
   async function setActiveSession(sessionId: string): Promise<void> {
-    await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/active`, { method: 'PUT' });
+    const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/active`, { method: 'PUT' });
+    const data = await res.json().catch(() => ({}));
+    if (!data || data.ok !== true) {
+      throw new Error(typeof data?.error === 'string' ? data.error : 'set_active_failed');
+    }
     activeSessionId = sessionId;
   }
 
@@ -60,11 +64,16 @@
   }
 
   async function createSession(): Promise<void> {
+    // Clear old messages immediately.
+    isChatActive = true;
+    resetChatState();
+
     const res = await fetch(`${API_BASE}/api/sessions`, { method: 'POST' });
     const data = await res.json();
     const sessionId = typeof data.session_id === 'string' ? data.session_id : null;
     await refreshSessions();
     if (!sessionId) return;
+
     await switchSession(sessionId);
   }
 
@@ -125,9 +134,10 @@
       ws = null;
     }
 
-    const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${wsProto}://${location.host}/ws?session_id=${encodeURIComponent(sessionId)}`;
+    status = 'disconnected';
 
+    const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${wsProto}://${location.host}/ws?session_id=${encodeURIComponent(sessionId)}`;
 
     ws = new WebSocket(wsUrl);
     ws.onopen = () => {
@@ -142,6 +152,21 @@
     ws.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);
+
+        if (msg.type === 'meta' && msg.event === 'ws_bound' && typeof msg.session_id === 'string') {
+          if (msg.session_id !== sessionId) {
+            status = 'disconnected';
+            try {
+              ws?.close();
+            } catch {
+              // ignore
+            }
+            ws = null;
+            return;
+          }
+          return;
+        }
+
         if (msg.type === 'agent_handoff' && typeof msg.to_agent === 'string') {
           messages = [...messages, { role: 'meta', text: `[handoff] -> ${msg.to_agent}` }];
           return;

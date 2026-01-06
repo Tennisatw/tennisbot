@@ -1,7 +1,6 @@
 import os
 import json
 import importlib
-import inspect
 
 from agents import Agent, ModelSettings
 from agents import handoff
@@ -66,6 +65,24 @@ def load_main_agent():
     ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     with open("agents/agent.md", "r", encoding="utf-8") as f:
         instructions = f.read().replace("<ROOT_PATH>", ROOT_PATH)
+
+    # Inject summaries of previous conversations into <PREVIOUS_CONV_SUMMARY>
+    summary = ""
+    n_summaries = 10
+    try:
+        files = sorted(os.listdir("data/session_summaries"), reverse=True)
+        for index, f in enumerate(files):
+            if index >= n_summaries:
+                break
+            summary_file = os.path.join("data/session_summaries", f)
+            with open(summary_file, "r", encoding="utf-8") as sf:
+                prev_summary = sf.read()
+                summary = prev_summary + "\n" + summary
+        summary = "Previous conversation summaries:\n" + summary
+
+        instructions = instructions.replace("<PREVIOUS_CONV_SUMMARY>", summary)
+    except Exception:
+        instructions = instructions.replace("<PREVIOUS_CONV_SUMMARY>", "")
 
     agent = Agent(
         name="Tennisbot",
