@@ -15,6 +15,7 @@ from src.session_history import get_recent_messages, push_session_history
 from src.sessions_index import SESSIONS_DIR, create_session as create_session_store, ensure_session_db, load_sessions_index, rebuild_sessions_index, set_active_session_id
 from src.settings import settings
 from src.logger import current_session_id, logger
+from src.session_archive import archive_session_store
 
 
 dotenv.load_dotenv()
@@ -148,6 +149,21 @@ async def create_session() -> dict[str, Any]:
     agents_by_session[session_id] = _new_session_agent()
 
     return created
+
+
+@app.post("/api/sessions/{session_id}/archive")
+async def archive_session(session_id: str) -> dict[str, Any]:
+    # Drop in-memory agent bundle for this session.
+    agents_by_session.pop(session_id, None)
+
+    """Archive a session.
+
+    Notes:
+        - Triggered by WebUI "End session".
+        - Actual summarization is TODO; current implementation deletes the db.
+    """
+
+    return archive_session_store(session_id=session_id)
 
 
 @app.get("/api/messages")

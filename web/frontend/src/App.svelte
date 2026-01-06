@@ -39,6 +39,7 @@
 
   async function ensureDefaultSession(): Promise<void> {
     await refreshSessions();
+
     if (sessions.length > 0) return;
 
     await fetch(`${API_BASE}/api/sessions`, { method: 'POST' });
@@ -85,7 +86,10 @@
     connect(sessionId);
   }
 
-  function endSession(): void {
+  async function endSession(): Promise<void> {
+    const sid = activeSessionId;
+
+    // Immediately detach UI.
     isChatActive = false;
     resetChatState();
 
@@ -97,6 +101,17 @@
       }
       ws = null;
     }
+
+    // Archive on server (best-effort).
+    if (sid) {
+      try {
+        await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sid)}/archive`, { method: 'POST' });
+      } catch {
+        // ignore
+      }
+    }
+
+    await refreshSessions();
   }
 
   function connect(sessionId: string): void {

@@ -8,6 +8,16 @@ SESSIONS_DIR = Path("data/sessions")
 SESSIONS_INDEX_PATH = SESSIONS_DIR / "index.json"
 
 
+def list_session_ids() -> list[str]:
+    """Return session ids from existing db files."""
+
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+
+    session_ids = list_session_ids()
+    return session_ids
+
+
+
 def rebuild_sessions_index() -> dict[str, Any]:
     """Rebuild sessions index from existing db files.
 
