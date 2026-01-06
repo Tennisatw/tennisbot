@@ -94,7 +94,7 @@
 2026.01.01:
 
 完善了session_cleanup，还是有点问题，但先将就用着。
-禁用了archive_session工具，现在只能通过热键归档会话。因为Tennisbot经常误用此工具。
+禁用了archive_session，现在只能通过热键归档会话。因为Tennisbot经常误用此工具。
 开发WebUI。
 （下载并安装Node.js）
 
@@ -121,7 +121,7 @@ WebUI基本上开发得差不多了，不过还有一个大bug：http://10.0.0.3
 
 2026.01.04:
 
-支持多 session
+支持多 session 会话。但是有一些bug
 
 <br>
 

@@ -11,13 +11,13 @@ def archive_session_store(*, session_id: str) -> dict[str, Any]:
     Behavior:
         - Summarize the session content via a lightweight summarizer agent.
         - Persist summary as a markdown file under `data/session_summaries/`.
-        - Delete the session db.
+        - Delete the session store file (.jsonl or legacy .db).
         - Rebuild sessions index.
         - If the deleted session was active, switch active to the newest remaining session.
 
     Notes:
-        - On Windows, deleting an open SQLite file raises WinError 32.
-          We close our own connections, then retry unlink a few times.
+        - On Windows, deleting an open SQLite file may raise WinError 32.
+          JsonlSession does not keep the file open, but we keep retries anyway.
 
     Returns:
         Dict with ok flag and updated active_session_id.
@@ -26,9 +26,11 @@ def archive_session_store(*, session_id: str) -> dict[str, Any]:
     if not session_id.isdigit():
         return {"ok": False, "error": "invalid_session_id"}
 
-    db_path = SESSIONS_DIR / f"{session_id}.db"
+    db_path = SESSIONS_DIR / f"{session_id}.jsonl"
     if not db_path.exists():
-        return {"ok": False, "error": "session_db_missing"}
+        db_path = SESSIONS_DIR / f"{session_id}.db"
+    if not db_path.exists():
+        return {"ok": False, "error": "session_store_missing"}
 
     from pathlib import Path
     import time
@@ -47,14 +49,13 @@ def archive_session_store(*, session_id: str) -> dict[str, Any]:
             transcript_lines.append(f"{role}: {text}")
 
     prompt = (
-        "请用中文，用一句话总结以下聊天记录。:\n"
-        "聊天记录:\n"
+        "请用中文，用一句话总结此会话。:\n"
         + "\n".join(transcript_lines)
     )
 
     summarizer = Agent(
         name="SessionSummarizer",
-        instructions="你写简洁、准确的会话总结。重点关注用户输入和结果。如没有聊天记录，则不输出任何内容。",
+        instructions="用中文输出简洁、准确的会话总结。重点关注用户输入和结果。如没有聊天记录，输出空格。用户是Tennisatw，AI助理是Tennisbot",
         model="gpt-5-mini",
         tools=[],
     )
@@ -67,7 +68,7 @@ def archive_session_store(*, session_id: str) -> dict[str, Any]:
     out_path = out_dir / f"{session_id}.md"
     out_path.write_text(summary_md, encoding="utf-8")
 
-    # Best-effort: Windows may keep the sqlite file locked briefly.
+    # Best-effort: Windows may keep the file locked briefly.
     last_err: Exception | None = None
     for _ in range(20):
         try:
@@ -79,7 +80,7 @@ def archive_session_store(*, session_id: str) -> dict[str, Any]:
             time.sleep(0.1)
 
     if last_err is not None and db_path.exists():
-        return {"ok": False, "error": "session_db_busy", "detail": repr(last_err)}
+        return {"ok": False, "error": "session_store_busy", "detail": repr(last_err)}
 
     index = rebuild_sessions_index()
 

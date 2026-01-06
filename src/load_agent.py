@@ -78,7 +78,6 @@ def load_main_agent():
             with open(summary_file, "r", encoding="utf-8") as sf:
                 prev_summary = sf.read()
                 summary = prev_summary + "\n" + summary
-        summary = "Previous conversation summaries:\n" + summary
 
         instructions = instructions.replace("<PREVIOUS_CONV_SUMMARY>", summary)
     except Exception:

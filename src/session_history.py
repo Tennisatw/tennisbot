@@ -28,30 +28,35 @@ def history_events_from_session(*, session_id: str, limit: int = 200) -> list[di
     """Build frontend-compatible events from stored session messages.
 
     Notes:
-        - Reads from the same SQLite db used by the WebUI session.
-        - Converts stored agent_messages rows into frontend-compatible WS events.
+        - Reads from `data/sessions/{session_id}.jsonl`.
+        - Converts stored items into frontend-compatible WS events.
         - Includes user/assistant chat, tool calls, and agent handoffs.
     """
 
     limit = max(1, min(int(limit), 2000))
 
-    import sqlite3
-
-    conn = sqlite3.connect(str(SESSIONS_DIR / f"{session_id}.db"), timeout=0.2)
-    try:
-        rows = conn.execute(
-            "SELECT id, message_data FROM agent_messages WHERE session_id=? ORDER BY id ASC LIMIT ?",
-            (session_id, limit),
-        ).fetchall()
-    finally:
-        conn.close()
+    path = SESSIONS_DIR / f"{session_id}.jsonl"
+    if not path.exists():
+        return []
 
     events: list[dict[str, Any]] = []
     last_tool_name: str | None = None
 
-    for _id, message_data in rows:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return []
+
+    # Keep only the last `limit` items.
+    lines = lines[-limit:]
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
         try:
-            data = json.loads(message_data)
+            data = json.loads(line)
         except Exception:
             continue
 
@@ -74,7 +79,6 @@ def history_events_from_session(*, session_id: str, limit: int = 200) -> list[di
             last_tool_name = None
             continue
 
-        # Agent SDK currently emits handoffs via logger.emit; keep this for future compatibility.
         if msg_type == "agent_handoff":
             to_agent = data.get("to_agent")
             if isinstance(to_agent, str) and to_agent:
@@ -96,25 +100,23 @@ def get_recent_messages(*, session_id: str, limit: int = 50) -> list[dict[str, A
 
     limit = max(1, min(int(limit), 200))
 
-    import sqlite3
-
-    db_path = SESSIONS_DIR / f"{session_id}.db"
-    if not db_path.exists():
+    path = SESSIONS_DIR / f"{session_id}.jsonl"
+    if not path.exists():
         return []
 
-    conn = sqlite3.connect(str(db_path), timeout=0.2)
     try:
-        rows = conn.execute(
-            "SELECT id, message_data FROM agent_messages WHERE session_id=? ORDER BY id DESC LIMIT ?",
-            (session_id, limit),
-        ).fetchall()
-    finally:
-        conn.close()
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return []
 
     items: list[dict[str, Any]] = []
-    for _id, message_data in reversed(rows):
+    for line in lines[-limit:]:
+        line = line.strip()
+        if not line:
+            continue
+
         try:
-            data = json.loads(message_data)
+            data = json.loads(line)
         except Exception:
             continue
 
@@ -124,7 +126,7 @@ def get_recent_messages(*, session_id: str, limit: int = 50) -> list[dict[str, A
 
         items.append(
             {
-                "id": str(data.get("id") or _id),
+                "id": str(data.get("id") or ""),
                 "role": role,
                 "text": extract_text(data),
             }

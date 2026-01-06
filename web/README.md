@@ -9,8 +9,9 @@ This folder contains the Web UI for Tennisbot.
   - FastAPI backend entry.
   - Endpoints:
     - `GET /api/health`: health check.
-    - `GET /api/messages`: read recent user/assistant messages from `data/sessions/1.db`.
+    - `GET /api/messages`: read recent user/assistant messages from `data/sessions/{session_id}.jsonl` (legacy: `.db`).
     - `WS /ws`: chat WebSocket. Receives `user_message`, runs the current agent via Agents SDK, and sends back events.
+
   - `EventBus` broadcasts server-side events (logger/tool calls/handoffs) to all connected WS clients.
   - Loads main agent + sub agents; keeps a `current_agent` that may change after handoffs.
 

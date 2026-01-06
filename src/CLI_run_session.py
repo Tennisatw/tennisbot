@@ -1,49 +1,35 @@
 # CLI 模式的会话运行器
 
 import os
-import sqlite3
 import time
 
-from agents import Runner, SQLiteSession, MaxTurnsExceeded
+from agents import Runner, MaxTurnsExceeded
+
+from src.jsonl_session import JsonlSession
 
 from src.logger import logger
 from src.settings import settings
 
 
-def session_cleanup(session_path: str = "data/sessions/0.db"):
-    """Cleanup session database files."""
+def session_cleanup(session_path: str = "data/sessions/0.jsonl"):
+    """Cleanup session store files."""
+
     if not os.path.exists(session_path):
-        logger.log("session.cleanup_skipped db_missing")
+        logger.log("session.cleanup_skipped store_missing")
         return
 
     # Reset the session store without deleting files.
-    # This keeps the db path stable while returning to an empty state.
-    conn = sqlite3.connect(session_path, timeout=0.2)
-    try:
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+    tmp_path = session_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write("")
+        f.flush()
+        os.fsync(f.fileno())
 
-        tables = [
-            row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
-            )
-        ]
-        for table in tables:
-            conn.execute(f"DELETE FROM {table};")
-    finally:
-        conn.close()
-
-    time.sleep(0.1) # otherwise: "cannot VACUUM from within a transaction"
-
-    conn2 = sqlite3.connect(session_path, timeout=0.2)
-    try:
-        conn2.execute("VACUUM;")
-    finally:
-        conn2.close()
-
+    os.replace(tmp_path, session_path)
     logger.log("session.cleanup_completed")
 
-async def run_session(agent, session: SQLiteSession):
+
+async def run_session(agent, session: JsonlSession):
     """Create agents and session, run the main chat loop."""
 
     current_agent = agent

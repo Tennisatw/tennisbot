@@ -6,7 +6,9 @@ import uuid
 from typing import Any
 
 import dotenv
-from agents import Runner, SQLiteSession
+from agents import Runner
+
+from src.jsonl_session import JsonlSession
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -129,7 +131,7 @@ async def set_active_session(session_id: str) -> dict[str, Any]:
     try:
         index = set_active_session_id(session_id)
     except FileNotFoundError:
-        return {"ok": False, "error": "session_db_missing"}
+        return {"ok": False, "error": "session_store_missing"}
     return {"ok": True, "active_session_id": index.get("active_session_id")}
 
 
@@ -164,13 +166,7 @@ async def archive_session(session_id: str) -> dict[str, Any]:
     # Drop in-memory agent bundle for this session.
     agents_by_session.pop(session_id, None)
 
-    # Close any open sqlite connection for this session.
-    # SQLiteSession keeps a connection open; on Windows this prevents deleting the db.
-    try:
-        session = SQLiteSession(session_id, db_path=str(SESSIONS_DIR / f"{session_id}.db"))
-        session.close()
-    except Exception:
-        pass
+    # No-op for JsonlSession.
 
     return await asyncio.to_thread(archive_session_store, session_id=session_id)
 
@@ -235,6 +231,15 @@ async def ws_endpoint(ws: WebSocket) -> None:
     # Resolve session_id before registering ws.
     session_id = ensure_session_db(ws.query_params.get("session_id"))
 
+    # Bind confirmation for frontend.
+    # Frontend uses this to avoid session switch race conditions.
+    await ws.send_text(
+        json.dumps(
+            {"type": "meta", "event": "ws_bound", "session_id": session_id},
+            ensure_ascii=False,
+        )
+    )
+
     await event_bus.add(ws, session_id=session_id)
     lock = asyncio.Lock()
 
@@ -286,7 +291,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
                     f"[ws] runner.start id={message_id} agent={getattr(current_agent, 'name', None)} "
                     f"model={getattr(current_agent, 'model', None)} key_set={bool(os.getenv('OPENAI_API_KEY'))}"
                 )
-                session = SQLiteSession(session_id, db_path=str(SESSIONS_DIR / f"{session_id}.db"))
+                session = JsonlSession(session_id, path=str(SESSIONS_DIR / f"{session_id}.jsonl"))
                 result = await Runner.run(
                     current_agent,
                     user_text,

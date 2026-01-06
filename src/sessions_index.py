@@ -14,7 +14,7 @@ def list_session_ids() -> list[str]:
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
     session_ids: list[str] = []
-    for p in SESSIONS_DIR.glob("*.db"):
+    for p in list(SESSIONS_DIR.glob("*.db")) + list(SESSIONS_DIR.glob("*.jsonl")):
         sid = p.stem
         if sid.isdigit():
             session_ids.append(sid)
@@ -47,7 +47,7 @@ def rebuild_sessions_index() -> dict[str, Any]:
         prev_active = None
 
     session_ids: list[str] = []
-    for p in SESSIONS_DIR.glob("*.db"):
+    for p in list(SESSIONS_DIR.glob("*.db")) + list(SESSIONS_DIR.glob("*.jsonl")):
         sid = p.stem
         if sid.isdigit():
             session_ids.append(sid)
@@ -98,7 +98,9 @@ def set_active_session_id(session_id: str) -> dict[str, Any]:
     if not session_id.isdigit():
         raise ValueError("invalid_session_id")
 
-    db_path = SESSIONS_DIR / f"{session_id}.db"
+    db_path = SESSIONS_DIR / f"{session_id}.jsonl"
+    if not db_path.exists():
+        db_path = SESSIONS_DIR / f"{session_id}.db"
     if not db_path.exists():
         raise FileNotFoundError("session_db_missing")
 
@@ -122,11 +124,10 @@ def create_session() -> dict[str, Any]:
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
     session_id = str(int(time.time() * 1000))
-    db_path = SESSIONS_DIR / f"{session_id}.db"
+    db_path = SESSIONS_DIR / f"{session_id}.jsonl"
     if not db_path.exists():
         # Touch the file so it appears in the index immediately.
-        # SQLiteSession will create tables lazily on first use.
-        db_path.write_bytes(b"")
+        db_path.write_text("", encoding="utf-8")
 
     index = rebuild_sessions_index()
     index["active_session_id"] = session_id
@@ -139,20 +140,24 @@ def create_session() -> dict[str, Any]:
 
 
 def ensure_session_db(session_id: str | None) -> str:
-    """Ensure a valid session db exists and return session_id."""
+    """Ensure a valid session store exists and return session_id."""
 
     if isinstance(session_id, str) and session_id.isdigit():
-        db_path = SESSIONS_DIR / f"{session_id}.db"
+        db_path = SESSIONS_DIR / f"{session_id}.jsonl"
+        if not db_path.exists():
+            db_path = SESSIONS_DIR / f"{session_id}.db"
         if db_path.exists():
             return session_id
 
     active = load_sessions_index().get("active_session_id")
     if isinstance(active, str) and active.isdigit():
-        db_path = SESSIONS_DIR / f"{active}.db"
+        db_path = SESSIONS_DIR / f"{active}.jsonl"
+        if not db_path.exists():
+            db_path = SESSIONS_DIR / f"{active}.db"
         if db_path.exists():
             return active
 
     session_id = str(int(time.time() * 1000))
-    (SESSIONS_DIR / f"{session_id}.db").write_bytes(b"")
+    (SESSIONS_DIR / f"{session_id}.jsonl").write_text("", encoding="utf-8")
     rebuild_sessions_index()
     return session_id

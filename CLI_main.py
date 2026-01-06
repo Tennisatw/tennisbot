@@ -3,7 +3,7 @@
 import asyncio
 import dotenv
 
-from agents import SQLiteSession
+from src.jsonl_session import JsonlSession
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 from src.cli_run_session import run_session, session_cleanup
 from src.logger import logger
@@ -27,10 +27,10 @@ if __name__ == "__main__":
             agent.handoffs = [create_handoff_obj(sub_agent) for sub_agent in agents_list]
 
             # Create a session
-            session = SQLiteSession("0", db_path="data/sessions/1.db")
+            session = JsonlSession("0", path="data/sessions/1.jsonl")
             # For multi-session (reserved)
             # datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            # session = SQLiteSession("0", db_path=f"data/sessions/{datetime_str}.db")
+            # session = JsonlSession("0", path=f"data/sessions/{datetime_str}.jsonl")
 
             # Start session
             asyncio.run(run_session(agent, session))
@@ -40,7 +40,7 @@ if __name__ == "__main__":
             # Raised by archive_session tool
             if e.code == 94: # Start a new session
                 logger.log("app.start_new_session")
-                session_cleanup(session_path="data/sessions/1.db")
+                session_cleanup(session_path="data/sessions/1.jsonl")
 
             # Raised by request_restart tool
             elif e.code == 95: # Exit application
