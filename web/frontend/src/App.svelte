@@ -14,7 +14,8 @@
 
   let ws: WebSocket | null = null;
 
-  const API_BASE = 'http://localhost:8000';
+    const API_BASE = '';
+
 
   marked.setOptions({
     gfm: true,
@@ -125,7 +126,8 @@
     }
 
     const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsUrl = `${wsProto}://${location.hostname}:8000/ws?session_id=${encodeURIComponent(sessionId)}`;
+        const wsUrl = `${wsProto}://${location.host}/ws?session_id=${encodeURIComponent(sessionId)}`;
+
 
     ws = new WebSocket(wsUrl);
     ws.onopen = () => {

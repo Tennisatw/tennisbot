@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, Literal
+import re
+
 
 from agents import function_tool
 from src.logger import logged_tool
@@ -177,13 +179,50 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
 
     match_idx = text.find(match, anchor_idx)
     if match_idx < 0:
+        window = text[anchor_idx : anchor_idx + 8192]
+
+        if match.startswith("re:"):
+            pattern = match[3:]
+            try:
+                m = re.search(pattern, window, flags=re.MULTILINE)
+            except re.error as e:
+                return text, _EditResult(
+                    success=False,
+                    file=file,
+                    op=op,
+                    anchor_hits=hits,
+                    changed=False,
+                    error=f"Invalid regex: {e}",
+                    preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
+                    preview_after="",
+                )
+
+            if m is not None:
+                a, b = m.span()
+                new_text = text[:anchor_idx] + window[:a] + content + window[b:] + text[anchor_idx + len(window) :]
+                return new_text, _EditResult(
+                    success=True,
+                    file=file,
+                    op=op,
+                    anchor_hits=hits,
+                    changed=(new_text != text),
+                    error=None,
+                    preview_before=_clip(window[a:b]),
+                    preview_after=_clip(content),
+                )
+        else:
+            rel = window.find(match)
+            if rel >= 0:
+                match_idx = anchor_idx + rel
+
+    if match_idx < 0:
         return text, _EditResult(
             success=False,
             file=file,
             op=op,
             anchor_hits=hits,
             changed=False,
-            error="Match not found after anchor",
+            error="Match not found after anchor (match is a literal substring; use re:... for regex)",
             preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
             preview_after="",
         )
@@ -222,6 +261,19 @@ async def edit_apply(
             "match": str,            # required for replace
             "occurrence": int,        # 1-based, default 1
         }
+
+    Match behavior:
+        - Literal: `match` is treated as a literal substring.
+        - Regex: prefix with `re:` to treat the rest as a Python regex (searched only within a small window after `anchor`).
+
+        Example:
+            {
+                "file": "src/app.py",
+                "op": "replace",
+                "anchor": "def foo():",
+                "match": "re:return\\s+\\d+",
+                "content": "return 0",
+            }
 
     Returns:
         dict: {

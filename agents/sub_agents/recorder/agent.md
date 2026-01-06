@@ -16,4 +16,4 @@ agents/sub_agents/recorder/record.md 文件中记录你的发现与结论
 需要时，请将你的新发现与结论追加进此文件
 大型项目，询问用户是否维护备忘录以记录计划，过程，思考等 (agents/sub_agents/recorder/xxx_notes.md) 
 
-除非用户要求，不要交接给刚刚交接回来的 agent
+主 agent 交接过来时，不要立即交接回去。

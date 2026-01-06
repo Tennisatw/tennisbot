@@ -153,17 +153,26 @@ async def create_session() -> dict[str, Any]:
 
 @app.post("/api/sessions/{session_id}/archive")
 async def archive_session(session_id: str) -> dict[str, Any]:
-    # Drop in-memory agent bundle for this session.
-    agents_by_session.pop(session_id, None)
-
     """Archive a session.
 
     Notes:
         - Triggered by WebUI "End session".
-        - Actual summarization is TODO; current implementation deletes the db.
+        - Runs the sync archiver in a worker thread (it calls Runner.run_sync).
+        - Ensure no active SQLiteSession is holding the db file.
     """
 
-    return archive_session_store(session_id=session_id)
+    # Drop in-memory agent bundle for this session.
+    agents_by_session.pop(session_id, None)
+
+    # Close any open sqlite connection for this session.
+    # SQLiteSession keeps a connection open; on Windows this prevents deleting the db.
+    try:
+        session = SQLiteSession(session_id, db_path=str(SESSIONS_DIR / f"{session_id}.db"))
+        session.close()
+    except Exception:
+        pass
+
+    return await asyncio.to_thread(archive_session_store, session_id=session_id)
 
 
 @app.get("/api/messages")
@@ -192,10 +201,12 @@ agents_by_session: dict[str, Any] = {}
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
+        allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://10.0.0.31:5173",
     ],
+
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

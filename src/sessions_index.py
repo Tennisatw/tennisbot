@@ -13,7 +13,13 @@ def list_session_ids() -> list[str]:
 
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
-    session_ids = list_session_ids()
+    session_ids: list[str] = []
+    for p in SESSIONS_DIR.glob("*.db"):
+        sid = p.stem
+        if sid.isdigit():
+            session_ids.append(sid)
+
+    session_ids.sort(reverse=True)
     return session_ids
 
 
@@ -65,6 +71,7 @@ def rebuild_sessions_index() -> dict[str, Any]:
     return index
 
 
+
 def load_sessions_index() -> dict[str, Any]:
     """Load sessions index, rebuilding it if missing or invalid."""
 
@@ -78,6 +85,7 @@ def load_sessions_index() -> dict[str, Any]:
         return data
     except Exception:
         return rebuild_sessions_index()
+
 
 
 def set_active_session_id(session_id: str) -> dict[str, Any]:
@@ -100,6 +108,7 @@ def set_active_session_id(session_id: str) -> dict[str, Any]:
     tmp_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp_path.replace(SESSIONS_INDEX_PATH)
     return index
+
 
 
 def create_session() -> dict[str, Any]:
@@ -126,6 +135,7 @@ def create_session() -> dict[str, Any]:
     tmp_path.replace(SESSIONS_INDEX_PATH)
 
     return {"session_id": session_id, "db_path": str(db_path)}
+
 
 
 def ensure_session_db(session_id: str | None) -> str:
