@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 from pathlib import Path
+import threading
 import time
 import asyncio
 
@@ -45,6 +46,16 @@ async def summarize_session(messages: list[dict[str, Any]], session_id: str) -> 
     out_path.write_text(summary_md, encoding="utf-8")
 
 
+def _summarize_session_bg(*, messages, session_id: str) -> None:
+    """Run session summarization in a background thread."""
+
+    try:
+        asyncio.run(summarize_session(messages=messages, session_id=session_id))
+    except Exception as e:
+        # Best-effort: do not crash caller.
+        print(f"[session_archive] summarize failed for {session_id}: {e}")
+
+
 def archive_session_store(*, session_id: str) -> dict[str, Any]:
     """Archive a session.
 
@@ -62,7 +73,11 @@ def archive_session_store(*, session_id: str) -> dict[str, Any]:
         return {"ok": False, "error": "invalid_session_id"}
     
     messages = get_recent_messages(session_id=session_id, limit=200)
-    asyncio.run(summarize_session(messages=messages, session_id=session_id))
+    threading.Thread(
+        target=_summarize_session_bg,
+        kwargs={"messages": messages, "session_id": session_id},
+        daemon=True,
+    ).start()
 
     db_path = SESSIONS_DIR / f"{session_id}.jsonl"
     if not db_path.exists():

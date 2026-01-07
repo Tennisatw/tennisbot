@@ -254,6 +254,7 @@ async def edit_apply(
     Notes:
         - This tool is a patchless alternative to unified diffs. Aimed at precise, small edits.
         - Each instruction targets a single file and uses an `anchor` to locate the edit.
+        - Try providing 2-3 lines for the anchor to ensure uniqueness.
         - For op=replace, `match` is required and will be replaced by `content`.
 
     Instruction schema:

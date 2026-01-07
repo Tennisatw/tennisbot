@@ -10,11 +10,6 @@
   let isChatActive = true;
 
   let status: 'disconnected' | 'connected' | 'new session' = 'disconnected';
-  // Track pending user messages waiting for assistant reply.
-  // If backend provides in_reply_to/message_id, we can clear precisely.
-  let pendingMessageIds = new Set<string>();
-
-
   let text = '';
   let messages: {
     role: 'user' | 'assistant' | 'meta';
@@ -72,7 +67,6 @@
 
   function resetChatState(): void {
     status = 'new session';
-    pendingMessageIds = new Set<string>();
     text = '';
     messages = [];
   }
@@ -140,7 +134,7 @@
 
   // Connect to backend WebSocket and route incoming events into UI messages.
   // Protocol (msg.type): meta(ws_bound), user_message, assistant_message, ack, tool_call, agent_handoff, error.
-  function connect(sessionId: string): void {
+    function connect(sessionId: string): void {
     // Close previous socket.
     if (ws) {
       try {
@@ -199,7 +193,6 @@
 
             const id = newId();
             messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
-            pendingMessageIds.add(id);
             sock.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
           }
           return;
@@ -222,18 +215,6 @@
         }
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'assistant', text: msg.text }];
-
-          // Clear pending precisely when backend provides linkage.
-          const replyTo =
-            typeof msg.in_reply_to === 'string'
-              ? msg.in_reply_to
-              : typeof msg.parent_id === 'string'
-                ? msg.parent_id
-                : null;
-
-          if (replyTo && pendingMessageIds.has(replyTo)) {
-            pendingMessageIds.delete(replyTo);
-          }
           return;
         }
         if (msg.type === 'user_message' && typeof msg.text === 'string') {
@@ -267,11 +248,15 @@
   }
 
   function send() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
     if (!activeSessionId) return;
 
     const t = text.trim();
     if (!t) return;
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      messages = [...messages, { role: 'meta', text: '[system] disconnected, cannot send' }];
+      return;
+    }
 
     if (wsSessionId !== activeSessionId) {
       // Socket not bound yet (or stale). Queue once and reconnect.
@@ -283,7 +268,6 @@
 
     const id = newId();
     messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
-    pendingMessageIds.add(id);
     ws.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
     text = '';
   }
@@ -338,13 +322,7 @@
           End session
         </button>
 
-        <div class="text-base text-gray-500">
-          {#if pendingMessageIds.size > 0}
-            thinking...
-          {:else}
-            {status}
-          {/if}
-        </div>
+      <div class="text-base text-gray-500">{status}</div>
       </div>
     </header>
 
