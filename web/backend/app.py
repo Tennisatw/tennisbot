@@ -108,9 +108,24 @@ class EventBus:
                         self._clients.pop(ws, None)
 
 event_bus = EventBus()
-logger.emit = event_bus.publish
 
 
+async def _emit(payload: dict[str, Any]) -> None:
+    """Emit server-side events to websocket clients.
+
+    Notes:
+        - Auto-inject session_id from ContextVar for tool/handoff events.
+        - Keep the logger.emit contract: async and accepts a dict payload.
+    """
+
+    sid = current_session_id.get()
+    if isinstance(sid, str) and sid and "session_id" not in payload:
+        payload = {**payload, "session_id": sid}
+
+    await event_bus.publish(payload)
+
+
+logger.emit = _emit
 @app.on_event("startup")
 async def _startup() -> None:
     asyncio.create_task(event_bus.run())

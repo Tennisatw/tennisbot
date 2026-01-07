@@ -28,7 +28,7 @@ doc string与代码注释：使用简洁明确的英文，风格一致
 核心代码（src/）：
     agent加载：src/load_agent.py
     logger相关：src/logger.py
-    运行会话相关：src/run_session.py
+    CLI 运行会话相关：src/cli_run_session.py
     WebUI session/index：src/sessions_index.py
     WebUI history/messages：src/session_history.py
 
@@ -45,16 +45,17 @@ Agent 相关（agents/）：
 数据（data/）：
     app配置：data/setting.json
     定时/周期性任务记录：data/schedule.json
-    会话文件：data/sessions/<session_id>.json
+    会话文件：data/sessions/<session_id>.jsonl
     WebUI sessions index：data/sessions/index.json
+    会话文件总结：data/session_summaries/<session_id>.md
 
 WebUI 相关（web/）：
     前端代码：web/frontend/
         入口：web/frontend/src/main.ts
         UI：web/frontend/src/App.svelte
     后端代码：web/backend/
-        入口：web/backend/app.py (FastAPI 路由/WS)
-    启动脚本：start_web.bat
+        核心：web/backend/app.py (FastAPI 路由/WS)
+    启动脚本：start_webui.bat
 
 CLI 运行模式：
     入口：cli_main.py

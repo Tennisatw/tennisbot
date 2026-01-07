@@ -173,6 +173,13 @@
       try {
         const msg = JSON.parse(ev.data);
 
+        // Only show meta/tool/handoff events for the active session.
+        // This is a UI safety net; backend should already scope events.
+        const msgSid = typeof msg.session_id === 'string' ? msg.session_id : null;
+        if (msgSid && activeSessionId && msgSid !== activeSessionId) {
+          return;
+        }
+
         if (msg.type === 'meta' && msg.event === 'ws_bound' && typeof msg.session_id === 'string') {
           wsSessionId = msg.session_id;
           if (msg.session_id !== sessionId) {

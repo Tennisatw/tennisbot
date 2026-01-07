@@ -136,11 +136,11 @@ class Logger:
 
         Notes:
             - Default behavior is to log it as a single line.
-            - Web backends may monkey-patch this method to forward events.
+            - Web backends will monkey-patch this method to forward events.
         """
 
         sid = current_session_id.get()
-        if isinstance(sid, str) and sid.isdigit() and "session_id" not in payload:
+        if isinstance(sid, str) and sid and "session_id" not in payload:
             payload = {**payload, "session_id": sid}
 
         self.log(f"event {payload}")
