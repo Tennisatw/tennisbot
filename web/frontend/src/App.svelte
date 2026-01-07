@@ -7,12 +7,15 @@
   let activeSessionId: string | null = null;
   let isChatActive = true;
 
-  let status: 'disconnected' | 'connected' = 'disconnected';
+  let status: 'disconnected' | 'connected' | 'new session' = 'disconnected';
   let pendingRuns = 0;
   let text = '';
   let messages: { role: 'user' | 'assistant' | 'meta'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
 
   let ws: WebSocket | null = null;
+  let wsSessionId: string | null = null;
+  let queuedText: string | null = null;
+
 
     const API_BASE = '';
 
@@ -57,7 +60,7 @@
   }
 
   function resetChatState(): void {
-    status = 'disconnected';
+    status = 'new session';
     pendingRuns = 0;
     text = '';
     messages = [];
@@ -83,17 +86,17 @@
     isChatActive = true;
     resetChatState();
 
-    if (ws) {
-      try {
-        ws.close();
-      } catch {
-        // ignore
-      }
-      ws = null;
+    // Connect first to avoid "UI switched but socket not ready" window.
+    connect(sessionId);
+
+    // Best-effort persist active session for sidebar highlight.
+    try {
+      await setActiveSession(sessionId);
+    } catch {
+      // ignore
     }
 
-    await setActiveSession(sessionId);
-    connect(sessionId);
+    await refreshSessions();
   }
 
   async function endSession(): Promise<void> {
@@ -125,6 +128,7 @@
   }
 
   function connect(sessionId: string): void {
+    // Close previous socket.
     if (ws) {
       try {
         ws.close();
@@ -135,34 +139,55 @@
     }
 
     status = 'disconnected';
+    wsSessionId = null;
 
     const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = `${wsProto}://${location.host}/ws?session_id=${encodeURIComponent(sessionId)}`;
 
-    ws = new WebSocket(wsUrl);
-    ws.onopen = () => {
+    const sock = new WebSocket(wsUrl);
+    ws = sock;
+
+    sock.onopen = () => {
+      if (sock !== ws) return;
       status = 'connected';
     };
-    ws.onclose = () => {
+    sock.onclose = () => {
+      if (sock !== ws) return;
       status = 'disconnected';
     };
-    ws.onerror = () => {
+    sock.onerror = () => {
+      if (sock !== ws) return;
       status = 'disconnected';
     };
-    ws.onmessage = (ev) => {
+    sock.onmessage = (ev) => {
+      // Drop messages from stale sockets.
+      if (sock !== ws) return;
+
       try {
         const msg = JSON.parse(ev.data);
 
         if (msg.type === 'meta' && msg.event === 'ws_bound' && typeof msg.session_id === 'string') {
+          wsSessionId = msg.session_id;
           if (msg.session_id !== sessionId) {
             status = 'disconnected';
             try {
-              ws?.close();
+              sock.close();
             } catch {
               // ignore
             }
-            ws = null;
+            if (ws === sock) ws = null;
             return;
+          }
+
+          // Flush queued message after socket is bound.
+          if (queuedText) {
+            const t = queuedText;
+            queuedText = null;
+
+            const id = newId();
+            messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
+            pendingRuns += 1;
+            sock.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
           }
           return;
         }
@@ -220,8 +245,18 @@
 
   function send() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!activeSessionId) return;
+
     const t = text.trim();
     if (!t) return;
+
+    if (wsSessionId !== activeSessionId) {
+      // Socket not bound yet (or stale). Queue once and reconnect.
+      queuedText = t;
+      text = '';
+      connect(activeSessionId);
+      return;
+    }
 
     const id = newId();
     messages = [...messages, { role: 'user', id, status: 'pending', text: t }];

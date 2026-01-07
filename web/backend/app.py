@@ -27,6 +27,36 @@ logger.log("webui.app.start")
 
 app = FastAPI(title="Tennisbot Web UI")
 
+@app.middleware("http")
+async def log_http_requests(request, call_next):
+    """Log HTTP request/response for WebUI API.
+
+    Notes:
+        - Keep it simple: method/path/query + status + elapsed.
+        - Avoid logging large bodies.
+    """
+
+    t0 = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        logger.log(
+            "http.error "
+            + f"method={request.method} path={request.url.path} query={request.url.query} "
+            + f"elapsed_ms={elapsed_ms} err={e!r}"
+        )
+        raise
+
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    logger.log(
+        "http "
+        + f"method={request.method} path={request.url.path} query={request.url.query} "
+        + f"status={getattr(response, 'status_code', None)} elapsed_ms={elapsed_ms}"
+    )
+    return response
+
+
 
 class EventBus:
     """Async event bus for pushing server-side events to WebSocket clients."""

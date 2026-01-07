@@ -25,10 +25,10 @@ def list_session_ids() -> list[str]:
 
 
 def rebuild_sessions_index() -> dict[str, Any]:
-    """Rebuild sessions index from existing db files.
+    """Rebuild sessions index from existing jsonl files.
 
     Notes:
-        - Treat `data/sessions/*.db` as the source of truth.
+        - Treat `data/sessions/*.jsonl` as the source of truth.
         - Sort sessions by session_id desc (newest first).
         - Preserve active_session_id when possible.
     """
@@ -47,7 +47,7 @@ def rebuild_sessions_index() -> dict[str, Any]:
         prev_active = None
 
     session_ids: list[str] = []
-    for p in list(SESSIONS_DIR.glob("*.db")) + list(SESSIONS_DIR.glob("*.jsonl")):
+    for p in list(SESSIONS_DIR.glob("*.jsonl")):
         sid = p.stem
         if sid.isdigit():
             session_ids.append(sid)
@@ -119,6 +119,9 @@ def create_session() -> dict[str, Any]:
     Requirements:
         - session_id is Unix epoch milliseconds.
         - If called twice within the same millisecond, create only one session.
+
+    Behavior:
+        - Make the new session the active session.
     """
 
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -129,15 +132,12 @@ def create_session() -> dict[str, Any]:
         # Touch the file so it appears in the index immediately.
         db_path.write_text("", encoding="utf-8")
 
-    index = rebuild_sessions_index()
-    index["active_session_id"] = session_id
-    tmp_path = SESSIONS_INDEX_PATH.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp_path.replace(SESSIONS_INDEX_PATH)
+    # Rebuild index first, then explicitly persist active_session_id.
+    # rebuild_sessions_index() preserves previous active_session_id when possible.
+    rebuild_sessions_index()
+    set_active_session_id(session_id)
 
     return {"session_id": session_id, "db_path": str(db_path)}
-
-
 
 def ensure_session_db(session_id: str | None) -> str:
     """Ensure a valid session store exists and return session_id."""

@@ -286,3 +286,28 @@
   - 写文章
 ## 2026.01.06
 - 调整记录体系：计划将 **session 存储从 db 文件切换为 jsonl**（开发记录新增）。
+
+## 2026.01.06 WebUI multi-session：New session 仍停留在老 session / 消息发到老 session（dev bug 记录）
+- 现象：点击 **New session** 后，界面仍停留在老 session；发送消息也会进入老 session。用户反馈：即使等待很久后再发，也仍会触发（非纯竞态）。
+- 初步判断：核心是 **WebSocket 切 session 时的“连接归属”不够强约束**。
+  - 后端 ws 在握手时用 query param `session_id` 绑定 session；`/api/sessions/{id}/active` 只影响 index 的 active_session_id，不会改变已建立 ws 的 session。
+  - 前端缺少“只接受当前 ws 的消息”的硬门禁，旧 ws 回调可能污染新 UI。
+
+### 前端修复（web/frontend/src/App.svelte）
+1) **stale socket drop**：`connect(sessionId)` 改为局部 `sock`，并在 `onopen/onclose/onerror/onmessage` 里加 `if (sock !== ws) return;`，避免旧连接消息/事件污染当前 UI。
+2) **绑定校验**：新增 `wsSessionId`，在收到后端 `meta/ws_bound` 时记录 socket 实际绑定的 session。
+3) **防误发 + 自动补发**：
+   - `send()` 中若 `wsSessionId !== activeSessionId`，不直接发送；改为把文本写入 `queuedText`，触发 `connect(activeSessionId)`。
+   - 在 `ws_bound` 且 session 匹配后，自动 flush `queuedText` 并发送（用户不再看到 `[warn] socket not bound...`，也不需要点第二次）。
+4) **切换 session 顺序优化**（不动 New session）：`switchSession()` 改为先 `connect(sessionId)`，再 best-effort `setActiveSession(sessionId)`，最后 `refreshSessions()`，减少“UI 切了但 ws 还没切”的窗口。
+5) **右上角状态三态**：`status` 从两态扩展为 `'disconnected' | 'connected' | 'new session'`；`resetChatState()` 时置为 `'new session'`，等待 `onopen` 再变 `connected`。
+
+### 过程中的小插曲/现象
+- 修复后出现提示：`[warn] socket not bound to active session, reconnecting...`。
+  - 解释：activeSessionId 已更新，但 ws 尚未收到 `ws_bound`（wsSessionId 仍为 null）或 ws_bound 偶发丢失/未处理。
+  - 处理：引入 queuedText + ws_bound 后自动补发，消除 warn 并提升体验。
+
+- 用户观察：New session 后右上角一直显示 disconnected，直到发出一条消息才变 connected。
+  - 处理思路：不引入 connecting（用户要求中间态命名为 `new session`），通过 resetChatState 设置该状态改善“状态显示不及时”。
+
+结论：无需从 0 重构，属于“少量关键不变式（invariants）没收口”导致的串台；通过前端 ws 生命周期强约束 + 绑定校验即可稳定修复。
