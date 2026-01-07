@@ -6,13 +6,21 @@
 
 <br>
 
-前端后端还有很多bug，也有点混乱。有时间可以重写一下。
+简化一下前后端的逻辑
 
-new_sesison 和 end_session 问题尤其严重。
+前提是我自己得看得懂代码。过两天再说吧。
 
 <br>
 
-考虑使用文档而不是数据库储存会话信息。
+后端 run_lock 是全局锁，会把所有 session 串行化。建议改成 “每个 session 一把锁”
+
+<br>
+
+edit_apply 工具的re有点问题，建议直接禁止。
+
+<br>
+
+archive_session 建议新开一个线程跑总结，以加速
 
 <br>
 

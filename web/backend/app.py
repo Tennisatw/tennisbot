@@ -123,7 +123,6 @@ logger.emit = event_bus.publish
 async def _startup() -> None:
     asyncio.create_task(event_bus.run())
     # Ensure sessions index exists.
-    # This also repairs it after manual deletion of db files.
     load_sessions_index()
 
 @app.get("/api/sessions")
@@ -131,7 +130,7 @@ async def list_sessions() -> dict[str, Any]:
     """List available sessions.
 
     Notes:
-        - Source of truth is `data/sessions/*.db`.
+        - Source of truth is `data/sessions/*.jsonl`.
         - Index is rebuilt on demand.
     """
 
@@ -145,7 +144,7 @@ async def set_active_session(session_id: str) -> dict[str, Any]:
 
     Notes:
         - Active session is persisted in `data/sessions/index.json`.
-        - If the db file is missing, this returns an error.
+        - If the jsonl file is missing, this returns an error.
     """
 
     if not session_id.isdigit():
@@ -183,7 +182,7 @@ async def archive_session(session_id: str) -> dict[str, Any]:
     Notes:
         - Triggered by WebUI "End session".
         - Runs the sync archiver in a worker thread (it calls Runner.run_sync).
-        - Ensure no active SQLiteSession is holding the db file.
+        - Ensure no active SQLiteSession is holding the jsonl file.
     """
 
     # Drop in-memory agent bundle for this session.

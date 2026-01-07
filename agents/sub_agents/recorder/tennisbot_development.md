@@ -335,3 +335,33 @@
   - anchor 定位改为 `text.find(anchor)`。
   - 错误文案微调：`Failed to locate anchor occurrence` → `Failed to locate anchor`。
 - 动机：避免“anchor 不唯一 + 宽正则 match”导致跨块误伤（此前曾把 `App.svelte` 结构替换坏）。
+
+## 2026.01.07（补记：web/backend/app.py 的 EventBus/WS 简化改造 + edit_apply 使用经验）
+- 目标：
+  - 合并两套推送通道（WS 直发 vs EventBus），只保留 EventBus。
+  - 简化 EventBus 数据结构与过滤逻辑。
+
+### 后端改动（web/backend/app.py）
+- EventBus：
+  - `_clients: set + _session_by_client` 合并为 `dict[WebSocket, str|None]`。
+  - `run()` 中一次性 snapshot `list(self._clients.items())`，减少锁粒度。
+  - session 过滤：payload 带 `session_id` 时按字符串相等过滤。
+- WS：
+  - 新增 `_ws_publish(session_id, payload)`，统一 WS outbound 走 EventBus，并自动补 `session_id`。
+  - `ws_bound / ack / error / assistant_message` 等消息逐步改为 `_ws_publish`。
+  - 多次小 patch 导致缩进漂移，最后通过“整段重排 ws_endpoint”恢复为可运行版本。
+  - 将 ws_endpoint 中的 `print(...)` 统一替换为 `logger.log(...)`（ws.recv / ws.runner.start/done/error / ws.sent）。
+- 注释补充：为模块、EventBus、_ws_publish、ws_endpoint、run_lock、last_agent 等补了简短注释；过程中因插入点/换行不严谨导致缩进与语法被破坏，随后修复。
+
+### edit_apply 工具使用反思（经验总结）
+- 常见错误：
+  - `Match not found after anchor`：match 是严格字面匹配，缩进/换行/引号/转义差一点就失败。
+  - `Anchor not unique (hits=N)`：anchor 选得太泛（如 `print(`、`except Exception:`）会命中多处。
+  - “改成功但缩进坏了”：工具不理解 AST，content 缺少换行或缩进不对会直接拼坏代码。
+- 注意事项：
+  - 优先“小刀法”（只改一行/一个分支），必要时再“整段重排”（尤其函数缩进漂移时）。
+  - anchor 选唯一且稳定的行（常量/函数签名/独特字面量），避免高频关键字。
+  - match 尽量短，并从 read_file 直接复制源片段，减少手打差异。
+  - 插入注释/控制流（try/except/with/if）附近尤其要检查换行与缩进，否则容易 SyntaxError。
+
+备注：用户最后要求“不要再修改代码，只记录总结”，因此此条为会话总结记录。

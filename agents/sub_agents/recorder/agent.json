@@ -9,5 +9,5 @@
         "openai:WebSearchTool"
     ],
     "temperature": 0.5,
-    "handoff_description": "to complete tasks related to understanding, analyzing, summarizing, and “interrogating” Tennisatw. Meanwhile, recording Tennisatw's experiences, thoughts and messages"
+    "handoff_description": "to complete tasks related to recording information as per user requests, and drafting diary entries."
 }
