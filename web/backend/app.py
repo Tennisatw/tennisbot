@@ -59,8 +59,7 @@ async def log_http_requests(request, call_next):
 
 
 class EventBus:
-    """Async event bus for pushing server-side events to WebSocket clients.
-    """
+    """Async event bus for pushing server-side events to WebSocket clients."""
 
     def __init__(self, *, maxsize: int = 2000):
         self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=maxsize)
@@ -68,15 +67,8 @@ class EventBus:
         self._clients: dict[WebSocket, str | None] = {}
         self._lock = asyncio.Lock()
 
-    def publish(self, payload: dict[str, Any]) -> None:
-        """Publish an event.
-        """
-
-        try:
-            self._queue.put_nowait(payload)
-        except asyncio.QueueFull:
-            # Drop events when queue is full to avoid blocking request/runner paths.
-            return
+    async def publish(self, payload: dict[str, Any]) -> None:
+        await self._queue.put(payload)
 
     async def add(self, ws: WebSocket, *, session_id: str | None) -> None:
         async with self._lock:
@@ -187,6 +179,8 @@ async def archive_session(session_id: str) -> dict[str, Any]:
 
     # Drop in-memory agent bundle for this session.
     agents_by_session.pop(session_id, None)
+    # Best-effort cleanup for per-session run lock.
+    run_locks_by_session.pop(session_id, None)
 
     # No-op for JsonlSession.
 
@@ -213,8 +207,24 @@ def _new_session_agent():
     agent.handoffs = [create_handoff_obj(sub_agent) for sub_agent in subs]
     return agent
 
-run_lock = asyncio.Lock()
+def _get_run_lock(session_id: str) -> asyncio.Lock:
+    """Get per-session run lock.
+
+    Notes:
+        - Avoid global serialization across sessions.
+        - Keep per-session agent state mutation serialized.
+    """
+
+    lock = run_locks_by_session.get(session_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        run_locks_by_session[session_id] = lock
+    return lock
+
+
+run_locks_by_session: dict[str, asyncio.Lock] = {}
 agents_by_session: dict[str, Any] = {}
+
 
 
 app.add_middleware(
@@ -238,12 +248,12 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
-    """Publish a websocket event scoped to a session.
-    """
+async def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
+    """Publish a websocket event scoped to a session."""
 
     payload.setdefault("session_id", session_id)
-    event_bus.publish(payload)
+    await event_bus.publish(payload)
+
 
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
@@ -261,7 +271,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
     # Bind confirmation for frontend.
     # Frontend uses this to avoid session switch race conditions.
-    _ws_publish(session_id, {"type": "meta", "event": "ws_bound", "session_id": session_id})
+    await _ws_publish(session_id, {"type": "meta", "event": "ws_bound", "session_id": session_id})
     # Frontend uses this to confirm the websocket is bound to the expected session.
 
     await event_bus.add(ws, session_id=session_id)
@@ -284,23 +294,23 @@ async def ws_endpoint(ws: WebSocket) -> None:
         try:
             msg = json.loads(raw)
         except Exception:
-            _ws_publish(session_id, {"type": "error", "message": "invalid_json"})
+            await _ws_publish(session_id, {"type": "error", "message": "invalid_json"})
             continue
 
         msg_type = msg.get("type")
         if msg_type != "user_message":
-            _ws_publish(session_id, {"type": "error", "message": "unsupported_type"})
+            await _ws_publish(session_id, {"type": "error", "message": "unsupported_type"})
             continue
 
         message_id = msg.get("message_id")
         logger.log(f"ws.recv user_message id={message_id}")
         logger.log("chat role=user input=" + msg.get("text", "").replace("\\n", "\\\\n"))
-        _ws_publish(session_id, {"type": "ack", "message_id": message_id, "queue_pos": 0})
+        await _ws_publish(session_id, {"type": "ack", "message_id": message_id, "queue_pos": 0})
 
         user_text = msg.get("text", "")
         try:
             # Serialize agent runs to avoid concurrent mutation of per-session agent state.
-            async with run_lock:
+            async with _get_run_lock(session_id):
                 current_agent = agents_by_session.get(session_id)
                 if current_agent is None:
                     current_agent = _new_session_agent()
@@ -337,11 +347,11 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 )
         except Exception as e:
             logger.log(f"ws.runner.error id={message_id} err={e!r}")
-            _ws_publish(session_id, {"type": "error", "message": "runner_failed", "detail": repr(e)})
+            await _ws_publish(session_id, {"type": "error", "message": "runner_failed", "detail": repr(e)})
             continue
 
         assistant_id = str(uuid.uuid4())
-        _ws_publish(
+        await _ws_publish(
             session_id,
             {
                 "type": "assistant_message",

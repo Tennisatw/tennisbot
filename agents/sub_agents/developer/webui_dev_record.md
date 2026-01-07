@@ -213,3 +213,8 @@ Example:
 - Theme color experiments were done and later reverted by user.
 - If Pylance complains about assigning to `logger.emit` due to `@dataclass(frozen=True)`, consider switching to `object.__setattr__` or removing `frozen`.
 
+
+## 2026-01-07: WebUI backend per-session run locks
+- Problem: global `run_lock` serialized agent runs across all sessions.
+- Fix: replace global lock with `run_locks_by_session: dict[str, asyncio.Lock]` and helper `_get_run_lock(session_id)`; use `async with _get_run_lock(session_id):` around `Runner.run` to keep per-session serialization but allow parallelism across sessions.
+- Also: cleanup `run_locks_by_session.pop(session_id, None)` in `/api/sessions/{session_id}/archive`.

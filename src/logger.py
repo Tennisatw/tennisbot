@@ -48,13 +48,13 @@ def logged_tool(fn):
             parts.append(f"{k}={_normalize_value(v)}")
         logger.log(" ".join(parts))
 
-        logger.emit({"type": "tool_call", "name": name, "phase": "start"})
+        await logger.emit({"type": "tool_call", "name": name, "phase": "start"})
 
         try:
             output = await fn(*args, **kwargs)
         except Exception as e:
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
-            logger.emit({"type": "tool_call", "name": name, "phase": "error"})
+            await logger.emit({"type": "tool_call", "name": name, "phase": "error"})
             raise
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
@@ -67,7 +67,7 @@ def logged_tool(fn):
         logger.log(" ".join(msgs))
 
         success = bool(output["success"]) if isinstance(output, dict) else False
-        logger.emit({"type": "tool_call", "name": name, "phase": "end", "success": success})
+        await logger.emit({"type": "tool_call", "name": name, "phase": "end", "success": success})
         return output
 
     return wrapper
@@ -131,7 +131,7 @@ class Logger:
         logging.getLogger(self.name).info(message)
         print(message if len(message) < 80 else message[:77] + "...")
 
-    def emit(self, payload: dict[str, Any]) -> None:
+    async def emit(self, payload: dict[str, Any]) -> None:
         """Emit a structured event.
 
         Notes:

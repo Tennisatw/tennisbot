@@ -49,7 +49,7 @@ async def run_session(agent, session: JsonlSession):
             result = await Runner.run(
                 current_agent,
                 user_input,
-                session=session,
+                session=session, # type: ignore
                 max_turns=settings.default_max_turns,
             )
 
