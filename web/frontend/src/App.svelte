@@ -386,7 +386,12 @@
           rows={3}
           placeholder="Type a message..."
           bind:value={text}
-          on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
+          on:keydown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
         ></textarea>
         <button
           class="px-4 py-2 text-base rounded-xl border border-gray-900 bg-gray-900 text-white"
