@@ -167,45 +167,58 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             preview_after="",
         )
 
-    match_idx = text.find(match, anchor_idx)
-    if match_idx < 0:
-        window = text[anchor_idx : anchor_idx + 8192]
+    window = text[anchor_idx : anchor_idx + 8192]
 
-        if match.startswith("re:"):
-            pattern = match[3:]
-            try:
-                m = re.search(pattern, window, flags=re.MULTILINE)
-            except re.error as e:
-                return text, _EditResult(
-                    success=False,
-                    file=file,
-                    op=op,
-                    anchor_hits=hits,
-                    changed=False,
-                    error=f"Invalid regex: {e}",
-                    preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
-                    preview_after="",
-                )
+    if match.startswith("re:"):
+        pattern = match[3:]
+        try:
+            m = re.search(pattern, window, flags=re.MULTILINE)
+        except re.error as e:
+            return text, _EditResult(
+                success=False,
+                file=file,
+                op=op,
+                anchor_hits=hits,
+                changed=False,
+                error=f"Invalid regex: {e}",
+                preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
+                preview_after="",
+            )
 
-            if m is not None:
-                a, b = m.span()
-                new_text = text[:anchor_idx] + window[:a] + content + window[b:] + text[anchor_idx + len(window) :]
-                return new_text, _EditResult(
-                    success=True,
-                    file=file,
-                    op=op,
-                    anchor_hits=hits,
-                    changed=(new_text != text),
-                    error=None,
-                    preview_before=_clip(window[a:b]),
-                    preview_after=_clip(content),
-                )
-        else:
-            rel = window.find(match)
-            if rel >= 0:
-                match_idx = anchor_idx + rel
+        if m is None:
+            return text, _EditResult(
+                success=False,
+                file=file,
+                op=op,
+                anchor_hits=hits,
+                changed=False,
+                error="Match not found after anchor (regex)",
+                preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
+                preview_after="",
+            )
 
-    if match_idx < 0:
+        a, b = m.span()
+        new_text = (
+            text[:anchor_idx]
+            + window[:a]
+            + content
+            + window[b:]
+            + text[anchor_idx + len(window) :]
+        )
+        return new_text, _EditResult(
+            success=True,
+            file=file,
+            op=op,
+            anchor_hits=hits,
+            changed=(new_text != text),
+            error=None,
+            preview_before=_clip(window[a:b]),
+            preview_after=_clip(content),
+        )
+
+    # Literal match
+    rel = window.find(match)
+    if rel < 0:
         return text, _EditResult(
             success=False,
             file=file,
@@ -217,6 +230,7 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             preview_after="",
         )
 
+    match_idx = anchor_idx + rel
     new_text = text[:match_idx] + content + text[match_idx + len(match) :]
     return new_text, _EditResult(
         success=True,
