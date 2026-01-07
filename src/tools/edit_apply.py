@@ -17,7 +17,6 @@ class Instruction(TypedDict, total=False):
     anchor: str
     content: str
     match: str          # required when op == "replace"
-    occurrence: int     # optional, default 1
 
 
 @dataclass(frozen=True)
@@ -37,17 +36,6 @@ def _clip(s: str, *, max_len: int = 240) -> str:
         return s
     return s[:max_len] + "..."
 
-def _find_nth(haystack: str, needle: str, occurrence: int) -> int:
-    """Return the start index of the nth occurrence (1-based)."""
-    if occurrence <= 0:
-        return -1
-    start = 0
-    for _ in range(occurrence):
-        idx = haystack.find(needle, start)
-        if idx < 0:
-            return -1
-        start = idx + len(needle)
-    return idx
 
 def _count_occurrences(haystack: str, needle: str) -> int:
     """Count non-overlapping occurrences."""
@@ -61,7 +49,6 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
     anchor = str(inst.get("anchor", ""))
     content = str(inst.get("content", ""))
     match = inst.get("match", None)
-    occurrence = int(inst.get("occurrence", 1))
 
     if not file:
         return text, _EditResult(
@@ -112,19 +99,22 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             preview_after="",
         )
 
-    if occurrence <= 0 or occurrence > hits:
+    # Guardrail: anchor must be unique.
+    # This avoids ambiguous edits when the same anchor appears multiple times.
+    if hits != 1:
         return text, _EditResult(
             success=False,
             file=file,
             op=op,
             anchor_hits=hits,
             changed=False,
-            error=f"Invalid occurrence: {occurrence} (hits={hits})",
+            error=f"Anchor not unique (hits={hits})",
             preview_before="",
             preview_after="",
         )
 
-    anchor_idx = _find_nth(text, anchor, occurrence)
+
+    anchor_idx = text.find(anchor)
     if anchor_idx < 0:
         return text, _EditResult(
             success=False,
@@ -132,7 +122,7 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             op=op,
             anchor_hits=hits,
             changed=False,
-            error="Failed to locate anchor occurrence",
+            error="Failed to locate anchor",
             preview_before="",
             preview_after="",
         )
@@ -259,7 +249,6 @@ async def edit_apply(
             "anchor": str,
             "content": str,
             "match": str,            # required for replace
-            "occurrence": int,        # 1-based, default 1
         }
 
     Match behavior:

@@ -10,7 +10,11 @@
   let isChatActive = true;
 
   let status: 'disconnected' | 'connected' | 'new session' = 'disconnected';
-  let pendingRuns = 0;
+  // Track pending user messages waiting for assistant reply.
+  // If backend provides in_reply_to/message_id, we can clear precisely.
+  let pendingMessageIds = new Set<string>();
+
+
   let text = '';
   let messages: {
     role: 'user' | 'assistant' | 'meta';
@@ -68,7 +72,7 @@
 
   function resetChatState(): void {
     status = 'new session';
-    pendingRuns = 0;
+    pendingMessageIds = new Set<string>();
     text = '';
     messages = [];
   }
@@ -195,7 +199,7 @@
 
             const id = newId();
             messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
-            pendingRuns += 1;
+            pendingMessageIds.add(id);
             sock.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
           }
           return;
@@ -218,7 +222,18 @@
         }
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'assistant', text: msg.text }];
-          pendingRuns = Math.max(0, pendingRuns - 1);
+
+          // Clear pending precisely when backend provides linkage.
+          const replyTo =
+            typeof msg.in_reply_to === 'string'
+              ? msg.in_reply_to
+              : typeof msg.parent_id === 'string'
+                ? msg.parent_id
+                : null;
+
+          if (replyTo && pendingMessageIds.has(replyTo)) {
+            pendingMessageIds.delete(replyTo);
+          }
           return;
         }
         if (msg.type === 'user_message' && typeof msg.text === 'string') {
@@ -229,7 +244,6 @@
           const detail = typeof msg.detail === 'string' ? `\n${msg.detail}` : '';
           const message = typeof msg.message === 'string' ? msg.message : 'unknown_error';
           messages = [...messages, { role: 'assistant', text: `[error] ${message}${detail}` }];
-          pendingRuns = Math.max(0, pendingRuns - 1);
           return;
         }
         if (msg.type === 'ack' && typeof msg.message_id === 'string') {
@@ -269,7 +283,7 @@
 
     const id = newId();
     messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
-    pendingRuns += 1;
+    pendingMessageIds.add(id);
     ws.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
     text = '';
   }
@@ -325,7 +339,7 @@
         </button>
 
         <div class="text-base text-gray-500">
-          {#if pendingRuns > 0}
+          {#if pendingMessageIds.size > 0}
             thinking...
           {:else}
             {status}

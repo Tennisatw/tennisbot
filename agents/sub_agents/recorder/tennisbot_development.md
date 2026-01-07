@@ -311,3 +311,27 @@
   - 处理思路：不引入 connecting（用户要求中间态命名为 `new session`），通过 resetChatState 设置该状态改善“状态显示不及时”。
 
 结论：无需从 0 重构，属于“少量关键不变式（invariants）没收口”导致的串台；通过前端 ws 生命周期强约束 + 绑定校验即可稳定修复。
+
+## 2026.01.07（WebUI pending/thinking 精确追踪 + edit_apply 工具安全护栏）
+
+### WebUI：右上角 thinking 状态修复（web/frontend/src/App.svelte）
+- 问题：右上角一直显示 `connected`，即使模型在思考。
+- 原因：`pendingMessageIds` 没有在发送/queued flush 时 `add`，且 `assistant_message` 分支未按 `in_reply_to/parent_id` 清除 pending。
+- 修复：
+  - `send()`：发送前 `pendingMessageIds.add(id)`。
+  - `meta/ws_bound` 的 queuedText flush：补发前 `pendingMessageIds.add(id)`。
+  - `assistant_message`：读取 `msg.in_reply_to`（fallback `msg.parent_id`）命中则 `pendingMessageIds.delete(replyTo)`。
+  - UI 仍用 `{#if pendingMessageIds.size > 0} thinking... {:else} {status} {/if}`。
+
+### WebUI：后端协议补充 in_reply_to（web/backend/app.py）
+- `assistant_message` payload 新增：`"in_reply_to": message_id`（指向触发该回复的 user_message id），用于前端精确清 pending。
+- 保留原字段：`message_id`（assistant uuid）、`parent_id`（仍为 user message id）。
+
+### 工具：edit_apply 安全性改进（src/tools/edit_apply.py）
+- 新增硬护栏：**anchor 必须唯一**，否则拒绝修改并返回 `Anchor not unique (hits=...)`。
+- 因 anchor 唯一，移除 `occurrence` 机制：
+  - `Instruction` schema / docstring 删除 `occurrence`。
+  - 删除 `_find_nth()` 与 occurrence 校验逻辑。
+  - anchor 定位改为 `text.find(anchor)`。
+  - 错误文案微调：`Failed to locate anchor occurrence` → `Failed to locate anchor`。
+- 动机：避免“anchor 不唯一 + 宽正则 match”导致跨块误伤（此前曾把 `App.svelte` 结构替换坏）。

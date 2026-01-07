@@ -59,35 +59,32 @@ async def log_http_requests(request, call_next):
 
 
 class EventBus:
-    """Async event bus for pushing server-side events to WebSocket clients."""
+    """Async event bus for pushing server-side events to WebSocket clients.
+    """
 
     def __init__(self, *, maxsize: int = 2000):
         self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=maxsize)
-        self._clients: set[WebSocket] = set()
-        self._session_by_client: dict[WebSocket, str | None] = {}
+        # Map websocket -> bound session_id (or None for broadcast).
+        self._clients: dict[WebSocket, str | None] = {}
         self._lock = asyncio.Lock()
 
     def publish(self, payload: dict[str, Any]) -> None:
         """Publish an event.
-
-        Notes:
-            - Non-blocking. Drops events when queue is full.
         """
 
         try:
             self._queue.put_nowait(payload)
         except asyncio.QueueFull:
+            # Drop events when queue is full to avoid blocking request/runner paths.
             return
 
     async def add(self, ws: WebSocket, *, session_id: str | None) -> None:
         async with self._lock:
-            self._clients.add(ws)
-            self._session_by_client[ws] = session_id
+            self._clients[ws] = session_id
 
     async def remove(self, ws: WebSocket) -> None:
         async with self._lock:
-            self._clients.discard(ws)
-            self._session_by_client.pop(ws, None)
+            self._clients.pop(ws, None)
 
     async def run(self) -> None:
         """Broadcast loop."""
@@ -98,18 +95,15 @@ class EventBus:
             payload_session_id = payload.get("session_id")
 
             async with self._lock:
-                clients = list(self._clients)
+                clients = list(self._clients.items())
 
             if not clients:
                 continue
 
             dead: list[WebSocket] = []
-            for ws in clients:
-                if isinstance(payload_session_id, str) and payload_session_id.isdigit():
-                    async with self._lock:
-                        ws_session_id = self._session_by_client.get(ws)
-                    if ws_session_id != payload_session_id:
-                        continue
+            for ws, ws_session_id in clients:
+                if isinstance(payload_session_id, str) and ws_session_id != payload_session_id:
+                    continue
 
                 try:
                     await ws.send_text(data)
@@ -119,8 +113,7 @@ class EventBus:
             if dead:
                 async with self._lock:
                     for ws in dead:
-                        self._clients.discard(ws)
-                        self._session_by_client.pop(ws, None)
+                        self._clients.pop(ws, None)
 
 event_bus = EventBus()
 logger.emit = event_bus.publish
@@ -246,14 +239,20 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
+    """Publish a websocket event scoped to a session.
+    """
+
+    payload.setdefault("session_id", session_id)
+    event_bus.publish(payload)
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
-    """WebSocket placeholder.
+    """WebSocket endpoint.
 
-    MVP behavior:
-    - Accept JSON messages.
-    If message type is "user_message", run the agent and return the response.
-    - Send back JSON messages.
+    Protocol:
+        - Client -> server: {"type": "user_message", "message_id": str, "text": str}
+        - Server -> client: events published via EventBus.
     """
 
     await ws.accept()
@@ -263,15 +262,10 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
     # Bind confirmation for frontend.
     # Frontend uses this to avoid session switch race conditions.
-    await ws.send_text(
-        json.dumps(
-            {"type": "meta", "event": "ws_bound", "session_id": session_id},
-            ensure_ascii=False,
-        )
-    )
+    _ws_publish(session_id, {"type": "meta", "event": "ws_bound", "session_id": session_id})
+    # Frontend uses this to confirm the websocket is bound to the expected session.
 
     await event_bus.add(ws, session_id=session_id)
-    lock = asyncio.Lock()
 
     token = current_session_id.set(session_id)
 
@@ -279,10 +273,6 @@ async def ws_endpoint(ws: WebSocket) -> None:
         await push_session_history(ws, session_id=session_id, limit=200)
     except Exception:
         pass
-
-    async def send(payload: dict[str, Any]) -> None:
-        async with lock:
-            await ws.send_text(json.dumps(payload, ensure_ascii=False))
 
     while True:
         try:
@@ -295,21 +285,22 @@ async def ws_endpoint(ws: WebSocket) -> None:
         try:
             msg = json.loads(raw)
         except Exception:
-            await send({"type": "error", "message": "invalid_json"})
+            _ws_publish(session_id, {"type": "error", "message": "invalid_json"})
             continue
 
         msg_type = msg.get("type")
         if msg_type != "user_message":
-            await send({"type": "error", "message": "unsupported_type"})
+            _ws_publish(session_id, {"type": "error", "message": "unsupported_type"})
             continue
 
         message_id = msg.get("message_id")
-        print(f"[ws] recv user_message id={message_id}")
-        logger.log("chat role=user input=" + msg.get("text", "").replace("\n", "\\n"))
-        await send({"type": "ack", "message_id": message_id, "queue_pos": 0})
+        logger.log(f"ws.recv user_message id={message_id}")
+        logger.log("chat role=user input=" + msg.get("text", "").replace("\\n", "\\\\n"))
+        _ws_publish(session_id, {"type": "ack", "message_id": message_id, "queue_pos": 0})
 
         user_text = msg.get("text", "")
         try:
+            # Serialize agent runs to avoid concurrent mutation of per-session agent state.
             async with run_lock:
                 current_agent = agents_by_session.get(session_id)
                 if current_agent is None:
@@ -317,22 +308,25 @@ async def ws_endpoint(ws: WebSocket) -> None:
                     agents_by_session[session_id] = current_agent
 
                 t0 = time.time()
-                print(
-                    f"[ws] runner.start id={message_id} agent={getattr(current_agent, 'name', None)} "
-                    f"model={getattr(current_agent, 'model', None)} key_set={bool(os.getenv('OPENAI_API_KEY'))}"
+                logger.log(
+                    "ws.runner.start "
+                    + f"id={message_id} agent={getattr(current_agent, 'name', None)} "
+                    + f"model={getattr(current_agent, 'model', None)} key_set={bool(os.getenv('OPENAI_API_KEY'))}"
                 )
+
                 session = JsonlSession(session_id, path=str(SESSIONS_DIR / f"{session_id}.jsonl"))
                 result = await Runner.run(
                     current_agent,
                     user_text,
-                    session=session,
+                    session=session, # type: ignore
                     max_turns=settings.default_max_turns,
                 )
                 dt_ms = int((time.time() - t0) * 1000)
-                print(f"[ws] runner.done id={message_id} ms={dt_ms}")
+                logger.log(f"ws.runner.done id={message_id} ms={dt_ms}")
 
                 last_agent = getattr(result, "last_agent", None)
                 if last_agent is not None:
+                    # Persist last_agent to keep tool/handoff state across turns in this session.
                     agents_by_session[session_id] = last_agent
 
                 assistant_text = str(getattr(result, "final_output", ""))
@@ -340,20 +334,24 @@ async def ws_endpoint(ws: WebSocket) -> None:
                     "chat role=assistant name="
                     + getattr(agents_by_session[session_id], "name", "Agent")
                     + " output="
-                    + assistant_text.replace("\n", "\\n")
+                    + assistant_text.replace("\\n", "\\\\n")
                 )
         except Exception as e:
-            print(f"[ws] runner.error id={message_id} err={e!r}")
-            await send({"type": "error", "message": "runner_failed", "detail": repr(e)})
+            logger.log(f"ws.runner.error id={message_id} err={e!r}")
+            _ws_publish(session_id, {"type": "error", "message": "runner_failed", "detail": repr(e)})
             continue
 
         assistant_id = str(uuid.uuid4())
-        await send(
+        _ws_publish(
+            session_id,
             {
                 "type": "assistant_message",
+                # Link this assistant message to the triggering user message.
+                # Frontend uses this to clear precise pending state.
+                "in_reply_to": message_id,
                 "message_id": assistant_id,
                 "parent_id": message_id,
                 "text": assistant_text,
-            }
+            },
         )
-        print(f"[ws] sent assistant_message id={assistant_id} parent_id={message_id}")
+        logger.log(f"ws.sent assistant_message id={assistant_id} parent_id={message_id}")
