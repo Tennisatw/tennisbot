@@ -3,6 +3,8 @@
   import { marked } from 'marked';
 
   type SessionItem = { session_id: string };
+
+  // Sidebar sessions list.
   let sessions: SessionItem[] = [];
   let activeSessionId: string | null = null;
   let isChatActive = true;
@@ -10,48 +12,53 @@
   let status: 'disconnected' | 'connected' | 'new session' = 'disconnected';
   let pendingRuns = 0;
   let text = '';
-  let messages: { role: 'user' | 'assistant' | 'meta'; text: string; id?: string; status?: 'pending' | 'sent' }[] = [];
+  let messages: {
+    role: 'user' | 'assistant' | 'meta';
+    text: string;
+    id?: string;
+    status?: 'pending' | 'sent';
+  }[] = [];
 
+  // WebSocket connection for the currently active session.
   let ws: WebSocket | null = null;
+
+  // Session id confirmed by backend for this socket.
   let wsSessionId: string | null = null;
+
+  // Text queued while the socket is not yet bound to the expected session.
   let queuedText: string | null = null;
 
-
-    const API_BASE = '';
-
-
+  // Markdown rendering is sanitized before injecting into DOM.
   marked.setOptions({
     gfm: true,
-    breaks: true
+    breaks: true,
   });
 
-  function normalizeMarkdown(src: string): string {
-    return src.replace(/\n{3,}/g, '\n\n').trim();
+  function renderMarkdown(src: string): string {
+    return DOMPurify.sanitize(marked.parse(src.trim()) as string);
   }
 
-  function renderMarkdown(src: string): string {
-    const normalized = normalizeMarkdown(src);
-    return DOMPurify.sanitize(marked.parse(normalized) as string);
-  }
 
   async function refreshSessions(): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/sessions`);
+    const res = await fetch(`/api/sessions`);
     const data = await res.json();
     sessions = Array.isArray(data.sessions) ? data.sessions : [];
     activeSessionId = typeof data.active_session_id === 'string' ? data.active_session_id : null;
   }
+
 
   async function ensureDefaultSession(): Promise<void> {
     await refreshSessions();
 
     if (sessions.length > 0) return;
 
-    await fetch(`${API_BASE}/api/sessions`, { method: 'POST' });
+    await fetch(`/api/sessions`, { method: 'POST' });
     await refreshSessions();
   }
 
+
   async function setActiveSession(sessionId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/active`, { method: 'PUT' });
+    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/active`, { method: 'PUT' });
     const data = await res.json().catch(() => ({}));
     if (!data || data.ok !== true) {
       throw new Error(typeof data?.error === 'string' ? data.error : 'set_active_failed');
@@ -71,7 +78,7 @@
     isChatActive = true;
     resetChatState();
 
-    const res = await fetch(`${API_BASE}/api/sessions`, { method: 'POST' });
+    const res = await fetch(`/api/sessions`, { method: 'POST' });
     const data = await res.json();
     const sessionId = typeof data.session_id === 'string' ? data.session_id : null;
     await refreshSessions();
@@ -118,7 +125,7 @@
     // Archive on server (best-effort).
     if (sid) {
       try {
-        await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sid)}/archive`, { method: 'POST' });
+        await fetch(`/api/sessions/${encodeURIComponent(sid)}/archive`, { method: 'POST' });
       } catch {
         // ignore
       }
@@ -127,6 +134,8 @@
     await refreshSessions();
   }
 
+  // Connect to backend WebSocket and route incoming events into UI messages.
+  // Protocol (msg.type): meta(ws_bound), user_message, assistant_message, ack, tool_call, agent_handoff, error.
   function connect(sessionId: string): void {
     // Close previous socket.
     if (ws) {
