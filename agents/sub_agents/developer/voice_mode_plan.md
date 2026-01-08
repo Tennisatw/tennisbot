@@ -54,11 +54,11 @@ Date: 2026-01-08
 
 ### Message Types (Phase 1)
 Client -> Server:
-- `voice_input` {session_id, client_msg_id, audio_b64, mime}
+- `voice_input` {session_id, message_id, audio_b64, mime}
 - `voice_output_toggle` {session_id, enabled}
 
 Server -> Client:
-- `transcript_final` {session_id, client_msg_id, text}
+- `transcript_final` {session_id, message_id, text}
 - `assistant_text_final` {session_id, text}
 - `tts_audio_segment` {session_id, seq, text, audio_b64, mime:"audio/mpeg"}
 - `tts_done` {session_id}
