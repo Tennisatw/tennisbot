@@ -15,6 +15,7 @@
     role: 'user' | 'assistant' | 'meta';
     text: string;
     id?: string;
+    reply_to?: string;
     status?: 'pending' | 'sent';
   }[] = [];
 
@@ -45,7 +46,6 @@
   function renderMarkdown(src: string): string {
     return DOMPurify.sanitize(marked.parse(src.trim()) as string);
   }
-
 
   async function refreshSessions(): Promise<void> {
     const res = await fetch(`/api/sessions`);
@@ -229,6 +229,7 @@
           messages = [...messages, { role: 'meta', text: `[handoff] -> ${msg.to_agent}` }];
           return;
         }
+
         if (msg.type === 'tool_call' && typeof msg.name === 'string' && typeof msg.phase === 'string') {
           const name = msg.name;
           const phase = msg.phase;
@@ -240,8 +241,40 @@
           }
           return;
         }
+
+        if (msg.type === 'assistant_text_delta' && typeof msg.delta === 'string') {
+          const delta = msg.delta;
+          const replyTo = typeof msg.reply_to === 'string' ? msg.reply_to : null;
+          if (!delta || !replyTo) return;
+
+          // Append streaming delta to the assistant bubble bound to reply_to.
+          const idx = messages.findIndex((m) => m.role === 'assistant' && m.reply_to === replyTo);
+          if (idx >= 0) {
+            const m = messages[idx];
+            messages = [...messages.slice(0, idx), { ...m, text: m.text + delta }, ...messages.slice(idx + 1)];
+            return;
+          }
+
+          // First delta: create the assistant bubble.
+          messages = [...messages, { role: 'assistant', reply_to: replyTo, text: delta }];
+          return;
+        }
+
         if (msg.type === 'assistant_message' && typeof msg.text === 'string') {
-          messages = [...messages, { role: 'assistant', text: msg.text }];
+          const replyTo = typeof msg.reply_to === 'string' ? msg.reply_to : null;
+          if (!replyTo) {
+            messages = [...messages, { role: 'assistant', text: msg.text }];
+            return;
+          }
+
+          const idx = messages.findIndex((m) => m.role === 'assistant' && m.reply_to === replyTo);
+          if (idx >= 0) {
+            const m = messages[idx];
+            messages = [...messages.slice(0, idx), { ...m, text: msg.text }, ...messages.slice(idx + 1)];
+            return;
+          }
+
+          messages = [...messages, { role: 'assistant', reply_to: replyTo, text: msg.text }];
           return;
         }
 

@@ -12,6 +12,8 @@ from faster_whisper import WhisperModel
 
 import dotenv
 from agents import Runner
+from openai.types.responses import ResponseTextDeltaEvent
+
 
 from src.jsonl_session import JsonlSession
 from fastapi import FastAPI, WebSocket
@@ -457,6 +459,95 @@ async def _run_agent_for_user_text(*, session_id: str, message_id: str, user_tex
         )
         return assistant_text
 
+
+async def _run_agent_streaming_for_user_text(
+    *,
+    session_id: str,
+    reply_to_message_id: str,
+    user_text: str,
+) -> tuple[str, str]:
+    """Run agent in streaming mode.
+
+    Emits:
+        - assistant_text_delta events during generation.
+
+    Returns:
+        (assistant_message_id, final_text)
+
+    Notes:
+        - Serialized by per-session lock to avoid concurrent mutation.
+        - Updates `agents_by_session[session_id]` with `result.last_agent`.
+    """
+
+    async with _get_run_lock(session_id):
+        current_agent = agents_by_session.get(session_id)
+        if current_agent is None:
+            current_agent = _new_session_agent()
+            agents_by_session[session_id] = current_agent
+
+        message_id = reply_to_message_id
+        t0 = time.time()
+        logger.log(
+            "ws.runner.stream.start "
+            + f"id={message_id} agent={getattr(current_agent, 'name', None)} "
+            + f"model={getattr(current_agent, 'model', None)} key_set={bool(os.getenv('OPENAI_API_KEY'))}"
+        )
+
+        session = JsonlSession(session_id, path=str(SESSIONS_DIR / f"{session_id}.jsonl"))
+
+        streamed = Runner.run_streamed(
+            current_agent,
+            user_text,
+            session=session,  # type: ignore
+            max_turns=settings.default_max_turns,
+        )
+
+        delta_parts: list[str] = []
+        async for event in streamed.stream_events():
+            # The SDK exposes model streaming via raw response events.
+            if getattr(event, "type", None) != "raw_response_event":
+                continue
+
+            data = getattr(event, "data", None)
+            if isinstance(data, ResponseTextDeltaEvent):
+                delta = str(getattr(data, "delta", "") or "")
+                if not delta:
+                    continue
+
+                delta_parts.append(delta)
+                await _ws_publish(
+                    session_id,
+                    {
+                        "type": "assistant_text_delta",
+                        "reply_to": reply_to_message_id,
+                        "delta": delta,
+                    },
+                )
+
+        result = streamed.final_output
+
+        dt_ms = int((time.time() - t0) * 1000)
+        logger.log(f"ws.runner.stream.done id={message_id} ms={dt_ms}")
+
+        last_agent = getattr(result, "last_agent", None)
+        if last_agent is not None:
+            agents_by_session[session_id] = last_agent
+
+        final_text = str(getattr(result, "final_output", "") or "")
+        if not final_text:
+            final_text = "".join(delta_parts)
+
+        assistant_message_id = str(uuid.uuid4())
+        logger.log(
+            "chat role=assistant name="
+            + getattr(agents_by_session[session_id], "name", "Agent")
+            + " output="
+            + final_text.replace("\\n", "\\\\n")
+        )
+
+        return assistant_message_id, final_text
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     """WebSocket endpoint.
@@ -591,9 +682,9 @@ async def ws_endpoint(ws: WebSocket) -> None:
             try:
                 await _ws_publish(session_id, {"type": "ack", "message_id": message_id, "queue_pos": 0})
 
-                assistant_text = await _run_agent_for_user_text(
+                assistant_id, assistant_text = await _run_agent_streaming_for_user_text(
                     session_id=session_id,
-                    message_id=message_id,
+                    reply_to_message_id=message_id,
                     user_text=transcript,
                 )
             except Exception as e:
@@ -601,7 +692,6 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 await _ws_publish(session_id, {"type": "error", "message": "runner_failed", "detail": repr(e)})
                 continue
 
-            assistant_id = str(uuid.uuid4())
             await _ws_publish(
                 session_id,
                 {
@@ -614,6 +704,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
             logger.log(f"ws.sent assistant_message id={assistant_id} reply_to={message_id}")
             continue
 
+
         if msg_type != "user_message":
             await _ws_publish(session_id, {"type": "error", "message": "unsupported_type"})
             continue
@@ -625,9 +716,9 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
         user_text = msg.get("text", "")
         try:
-            assistant_text = await _run_agent_for_user_text(
+            assistant_id, assistant_text = await _run_agent_streaming_for_user_text(
                 session_id=session_id,
-                message_id=message_id,
+                reply_to_message_id=message_id,
                 user_text=user_text,
             )
         except Exception as e:
@@ -635,7 +726,6 @@ async def ws_endpoint(ws: WebSocket) -> None:
             await _ws_publish(session_id, {"type": "error", "message": "runner_failed", "detail": repr(e)})
             continue
 
-        assistant_id = str(uuid.uuid4())
         await _ws_publish(
             session_id,
             {
@@ -648,3 +738,4 @@ async def ws_endpoint(ws: WebSocket) -> None:
             },
         )
         logger.log(f"ws.sent assistant_message id={assistant_id} reply_to={message_id}")
+
