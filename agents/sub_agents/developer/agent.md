@@ -39,8 +39,6 @@ Agent 相关（agents/）：
     主agent提示词：agents/agent.md
     副agent配置：agents/sub_agents/<sub_agent_name>/agent.json
     副agent提示词（本文件）：agents/sub_agents/<sub_agent_name>/agent.md
-    注：<sub_agent_name> 比如 developer, recorder 等
-    每个agent所维护/使用的文件也在各自目录下
 
 数据（data/）：
     app配置：data/setting.json
@@ -50,11 +48,11 @@ Agent 相关（agents/）：
     会话文件总结：data/session_summaries/<session_id>.md
 
 WebUI 相关（web/）：
-    前端代码：web/frontend/
+    前端：web/frontend/
         入口：web/frontend/src/main.ts
-        UI：web/frontend/src/App.svelte
-    后端代码：web/backend/
-        核心：web/backend/app.py (FastAPI 路由/WS)
+        UI及逻辑：web/frontend/src/App.svelte
+    后端：web/backend/
+        核心逻辑：web/backend/app.py (FastAPI 路由/WS)
     启动脚本：start_webui.bat
 
 CLI 运行模式：
