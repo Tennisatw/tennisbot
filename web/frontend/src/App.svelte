@@ -27,6 +27,9 @@
   // Text queued while the socket is not yet bound to the expected session.
   let queuedText: string | null = null;
 
+  // Voice payload queued while the socket is not yet bound to the expected session.
+  let queuedVoicePayload: any | null = null;
+
   // Voice input (Phase 1): mic recording -> voice_input ws message.
   let isRecording = false;
   let recorder: MediaRecorder | null = null;
@@ -208,6 +211,17 @@
             messages = [...messages, { role: 'user', id, status: 'pending', text: t }];
             sock.send(JSON.stringify({ type: 'user_message', message_id: id, text: t }));
           }
+
+          // Flush queued voice payload after socket is bound.
+          if (queuedVoicePayload) {
+            const payload = queuedVoicePayload;
+            queuedVoicePayload = null;
+            try {
+              sock.send(JSON.stringify(payload));
+            } catch {
+              // ignore
+            }
+          }
           return;
         }
 
@@ -299,7 +313,18 @@
         messages = [...messages, { role: 'user', id: messageId, status: 'pending', text: '(transcribing...)' }];
 
         const audio_b64 = await blobToBase64(blob);
-        wsSend({ type: 'voice_input', session_id: activeSessionId, message_id: messageId, audio_b64, mime });
+        const payload = { type: 'voice_input', session_id: activeSessionId, message_id: messageId, audio_b64, mime };
+
+        // If the socket is not yet bound (e.g. first message after session switch),
+        // queue this payload and reconnect.
+        if (!ws || ws.readyState !== WebSocket.OPEN || wsSessionId !== activeSessionId) {
+          queuedVoicePayload = payload;
+          if (activeSessionId) {
+            connect(activeSessionId);
+          }
+        } else {
+          wsSend(payload);
+        }
       } catch {
         messages = [...messages, { role: 'meta', text: '[system] voice record failed' }];
       } finally {
