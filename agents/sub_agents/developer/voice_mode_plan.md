@@ -269,3 +269,96 @@ Per session:
   - On `tts_audio_segment`: base64->Blob URL enqueue; play sequentially.
   - On `ended/error`: auto play next; revoke object URLs.
   - On speaker off / ws disconnect: stop + clear queue.
+
+
+## Patch Log (2026-01-08) - Hotfix (Fix App.svelte audio handler placement)
+- Frontend `web/frontend/src/App.svelte`
+  - Fix a broken function nesting introduced by earlier patch: `handleAudioEnded()` was accidentally inserted inside `stopAndClearAudioQueue()`.
+  - Keep `handleAudioEnded()` as a top-level function.
+  - Keep `<audio bind:this={audioEl} on:ended={handleAudioEnded} on:error={handleAudioEnded}>`.
+
+
+## Patch Log (2026-01-08) - Hotfix (Audio element breaks UI: move listeners out of template)
+- Frontend `web/frontend/src/App.svelte`
+  - Remove `on:ended/on:error` from `<audio>` tag.
+  - Add `bindAudioListenersIfNeeded()` and attach `ended/error` listeners via `audioEl.addEventListener(...)`.
+  - Ensure listeners are bound before playback (called in `playNextAudio()` and `switchSession()`).
+  - Add a small interval to bind listeners once `audioEl` exists.
+
+Rationale:
+- In some Svelte/Vite states, template-side listeners on `<audio>` caused the UI to stop rendering without a visible console error (likely a compile/runtime edge).
+
+
+## Dev Notes (2026-01-08) - Frontend Audio Element Bug & Workaround Plan
+
+### Observed issue
+- In this project, adding an `<audio>` element in the Svelte template (even a minimal `<audio bind:this={...}></audio>` or with `on:ended/on:error`) can cause the whole WebUI to become non-interactive:
+  - sessions list not loaded
+  - buttons not clickable
+  - page not blank (layout still appears)
+  - browser console may show no error
+- Interesting behavior: if the page is loaded first, then `<audio>` is pasted in and refreshed, it may work. This strongly suggests a dev/HMR/runtime edge case.
+
+### Decision
+- Do **NOT** use `<audio>` in Svelte template for now.
+- Implement TTS playback using **pure JS Audio()** objects to bypass template-level issues.
+
+### Required frontend changes (next steps)
+1) Remove all `<audio ...>` tags from Svelte template
+- No `bind:this={audioEl}`
+- No `on:ended/on:error` on `<audio>`
+
+2) Use JS Audio() player
+State:
+- `let audioPlayer: HTMLAudioElement | null = null`
+- Keep existing `audioQueue: Array<{seq, url, reply_to}>`, `isPlayingAudio`, `currentAudioUrl`
+
+Flow:
+- On `tts_audio_segment`:
+  - `audio_b64` -> Blob -> ObjectURL
+  - `audioQueue.push({seq, url, reply_to})`
+  - if idle: `playNextAudio()`
+
+- `playNextAudio()`:
+  - guard: `isPlayingAudio`, `voiceOutputEnabled`, `audioQueue.length`
+  - `next = shift(queue)`
+  - `isPlayingAudio=true; currentAudioUrl=next.url`
+  - `audioPlayer = new Audio(next.url)`
+  - `audioPlayer.onended = handleAudioEnded`
+  - `audioPlayer.onerror = handleAudioEnded`
+  - `audioPlayer.play()`; on reject, call `handleAudioEnded()` to skip
+
+- `handleAudioEnded()`:
+  - `isPlayingAudio=false`
+  - revoke `currentAudioUrl`
+  - `currentAudioUrl=null`
+  - `playNextAudio()`
+
+- `stopAndClearAudioQueue()`:
+  - `audioPlayer?.pause(); audioPlayer.src=''`
+  - clear `onended/onerror`
+  - set `audioPlayer=null`
+  - revoke `currentAudioUrl`
+  - revoke all queued urls
+  - clear queue; set `isPlayingAudio=false; currentAudioUrl=null`
+
+3) Must call `stopAndClearAudioQueue()` on these events
+- Speaker toggle OFF
+- WS `onclose` / `onerror`
+- session switch (`switchSession`)
+- end session (`endSession`)
+
+4) Autoplay policy handling (expected)
+- If `audio.play()` is blocked, show a meta hint like "click anywhere to enable audio" and keep the system stable.
+
+5) Cleanup old audio-element based helpers
+- Remove / no-op any leftover:
+  - `audioEl`
+  - `bindAudioListenersIfNeeded()`
+  - `_audioBindTimer`
+
+### Current state snapshot
+- Backend can inject fake mp3 audio via env `TTS_FAKE_AUDIO_PATH` and send `tts_audio_segment.audio_b64`.
+- Frontend currently has partial queue logic but must switch to the JS Audio() approach to avoid template `<audio>`.
+
+- 如果未来遇到浏览器 autoplay policy 拦截，可在 `audioPlayer.play()` 失败时提示用户（meta："[tts] autoplay blocked, click anywhere to enable audio"），并不要直接丢弃队列。

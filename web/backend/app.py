@@ -441,7 +441,6 @@ VOICE_DEBUG_DUMP_DIR = "data/voice_debug"
 
 # Voice output (TTS) debug: if set, server will send this mp3 payload for every tts_audio_segment.
 # Example: TTS_FAKE_AUDIO_PATH=data/temp/y2294.mp3
-TTS_FAKE_AUDIO_PATH = os.getenv("TTS_FAKE_AUDIO_PATH", "").strip()
 _tts_fake_audio_b64: str | None = None
 
 _stt_model: WhisperModel | None = None

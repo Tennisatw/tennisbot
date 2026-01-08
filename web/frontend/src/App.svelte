@@ -38,14 +38,21 @@
   let audioQueue: { seq: number; url: string; reply_to: string | null }[] = [];
   let isPlayingAudio = false;
   let currentAudioUrl: string | null = null;
-  let audioEl: HTMLAudioElement | null = null;
+  let audioPlayer: HTMLAudioElement | null = null;
 
   function stopAndClearAudioQueue(): void {
     try {
-      audioEl?.pause();
+      if (audioPlayer) {
+        audioPlayer.onended = null;
+        audioPlayer.onerror = null;
+        audioPlayer.pause();
+        audioPlayer.src = '';
+      }
     } catch {
       // ignore
     }
+    audioPlayer = null;
+
     if (currentAudioUrl) {
       try {
         URL.revokeObjectURL(currentAudioUrl);
@@ -65,10 +72,26 @@
     currentAudioUrl = null;
   }
 
+  function handleAudioEnded(): void {
+    isPlayingAudio = false;
+
+    if (currentAudioUrl) {
+      try {
+        URL.revokeObjectURL(currentAudioUrl);
+      } catch {
+        // ignore
+      }
+    }
+
+    currentAudioUrl = null;
+    audioPlayer = null;
+
+    void playNextAudio();
+  }
+
   async function playNextAudio(): Promise<void> {
     if (isPlayingAudio) return;
     if (!voiceOutputEnabled) return;
-    if (!audioEl) return;
     if (audioQueue.length === 0) return;
 
     const next = audioQueue[0];
@@ -78,13 +101,13 @@
     currentAudioUrl = next.url;
 
     try {
-      audioEl.src = next.url;
-      await audioEl.play();
+      audioPlayer = new Audio(next.url);
+      audioPlayer.onended = handleAudioEnded;
+      audioPlayer.onerror = handleAudioEnded;
+      await audioPlayer.play();
     } catch {
-      // If autoplay is blocked or decode fails, skip.
-      isPlayingAudio = false;
-      currentAudioUrl = null;
-      playNextAudio();
+      // Autoplay blocked or decode failed: skip this segment.
+      handleAudioEnded();
     }
   }
 
@@ -243,13 +266,12 @@
       status = 'disconnected';
       stopAndClearAudioQueue();
     };
-      stopAndClearAudioQueue();
+
     sock.onerror = () => {
       if (sock !== ws) return;
       status = 'disconnected';
       stopAndClearAudioQueue();
     };
-      stopAndClearAudioQueue();
     sock.onmessage = (ev) => {
       // Drop messages from stale sockets.
       if (sock !== ws) return;
