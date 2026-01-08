@@ -5,6 +5,7 @@ import time
 import uuid
 from typing import Any
 import base64
+from dataclasses import dataclass, field
 import subprocess
 import tempfile
 
@@ -26,7 +27,7 @@ from src.settings import settings
 from src.logger import current_session_id, logger
 from src.session_archive import archive_session_store
 
-
+TTS_FAKE_AUDIO_PATH="data/temp/y2294.mp3"
 dotenv.load_dotenv()
 
 logger.setup()
@@ -247,6 +248,163 @@ def _get_run_lock(session_id: str) -> asyncio.Lock:
 run_locks_by_session: dict[str, asyncio.Lock] = {}
 agents_by_session: dict[str, Any] = {}
 
+# --- Voice output (TTS) session state (Phase 1/2)
+# Note: actual TTS synthesis is implemented in next step. For now we only
+# persist the toggle state and define outgoing event types.
+voice_output_enabled_by_session: dict[str, bool] = {}
+
+
+
+@dataclass
+class TtsSessionState:
+    enabled: bool = False
+    seq: int = 0
+    queue: asyncio.Queue[str] = field(default_factory=lambda: asyncio.Queue(maxsize=200))
+    tail_buffer: str = ""
+    cancel_gen: int = 0
+    worker_task: asyncio.Task | None = None
+    reply_to: str | None = None
+
+
+tts_state_by_session: dict[str, TtsSessionState] = {}
+
+
+def _get_tts_state(session_id: str) -> TtsSessionState:
+    st = tts_state_by_session.get(session_id)
+    if st is None:
+        st = TtsSessionState(enabled=bool(voice_output_enabled_by_session.get(session_id, False)))
+        tts_state_by_session[session_id] = st
+    return st
+
+
+def _tts_split_flushable_segments(*, buf: str, min_chars: int = 16) -> tuple[list[str], str]:
+    """Split buffer into flushable segments.
+
+    Delimiters: 。！？\n
+    Returns: (segments_to_flush, remaining_buf)
+
+    Rule:
+      - Emit a segment only when a delimiter is seen AND the candidate segment length >= min_chars.
+      - Otherwise keep buffering (short sentence merge).
+    """
+
+    delims = set(["。", "！", "？", "\n"])
+    out: list[str] = []
+    last_cut = 0
+
+    for i, ch in enumerate(buf):
+        if ch not in delims:
+            continue
+
+        cand = buf[last_cut : i + 1]
+        if len(cand.strip()) < min_chars:
+            continue
+
+        out.append(cand.strip())
+        last_cut = i + 1
+
+    rest = buf[last_cut:]
+    return out, rest
+
+
+def _tts_maybe_start_worker(*, session_id: str) -> None:
+    st = _get_tts_state(session_id)
+    if st.worker_task is not None and not st.worker_task.done():
+        return
+
+    async def _worker(gen: int) -> None:
+        while True:
+            seg = await st.queue.get()
+
+            # canceled or disabled: drop.
+            if gen != st.cancel_gen or not st.enabled:
+                continue
+
+            st.seq += 1
+            seq = st.seq
+            reply_to = st.reply_to
+
+            global _tts_fake_audio_b64
+            audio_b64 = ""
+            if TTS_FAKE_AUDIO_PATH:
+                try:
+                    if _tts_fake_audio_b64 is None:
+                        with open(TTS_FAKE_AUDIO_PATH, "rb") as f:
+                            _tts_fake_audio_b64 = base64.b64encode(f.read()).decode("ascii")
+                    audio_b64 = _tts_fake_audio_b64 or ""
+                except Exception as e:
+                    logger.log(f"tts.fake_audio_load_failed path={TTS_FAKE_AUDIO_PATH} err={e!r}")
+
+            # Fake TTS for now: send empty audio payload.
+            await _ws_publish(
+                session_id,
+                {
+                    "type": "tts_audio_segment",
+                    "reply_to": reply_to,
+                    "seq": seq,
+                    "text": seg,
+                    "audio_b64": audio_b64,
+                    "mime": "audio/mpeg",
+                },
+            )
+
+    st.worker_task = asyncio.create_task(_worker(st.cancel_gen))
+
+
+def _tts_reset_session(*, session_id: str) -> None:
+    st = _get_tts_state(session_id)
+    st.cancel_gen += 1
+    st.tail_buffer = ""
+    st.reply_to = None
+    # best-effort drain queue
+    try:
+        while not st.queue.empty():
+            st.queue.get_nowait()
+    except Exception:
+        pass
+
+
+async def _tts_enqueue_text(*, session_id: str, reply_to: str, text_delta: str) -> None:
+    """Delta-driven segmenter + enqueue with waterline/tail_buffer."""
+
+    st = _get_tts_state(session_id)
+    if not st.enabled:
+        return
+
+    if st.reply_to != reply_to:
+        # New turn: reset seq/buffers for clarity.
+        st.seq = 0
+        st.tail_buffer = ""
+        st.reply_to = reply_to
+
+    buf = st.tail_buffer + text_delta
+    segs, rest = _tts_split_flushable_segments(buf=buf, min_chars=16)
+
+    # Waterline: allow at most 5 frozen segments in queue.
+    for seg in segs:
+        if st.queue.qsize() >= 5:
+            st.tail_buffer = rest
+            st.tail_buffer += seg
+            return
+        await st.queue.put(seg)
+
+    st.tail_buffer = rest
+    _tts_maybe_start_worker(session_id=session_id)
+
+
+async def _tts_finalize_reply(*, session_id: str, reply_to: str) -> None:
+    st = _get_tts_state(session_id)
+    if not st.enabled:
+        return
+
+    # Flush tail_buffer even if short.
+    if st.reply_to == reply_to and st.tail_buffer.strip():
+        if st.queue.qsize() < 5:
+            await st.queue.put(st.tail_buffer.strip())
+        st.tail_buffer = ""
+
+    await _ws_publish(session_id, {"type": "tts_done", "reply_to": reply_to})
+
 
 
 app.add_middleware(
@@ -280,6 +438,11 @@ async def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
 VOICE_INPUT_MAX_BYTES = 20 * 1024 * 1024
 VOICE_STT_MODEL_SIZE = "medium"
 VOICE_DEBUG_DUMP_DIR = "data/voice_debug"
+
+# Voice output (TTS) debug: if set, server will send this mp3 payload for every tts_audio_segment.
+# Example: TTS_FAKE_AUDIO_PATH=data/temp/y2294.mp3
+TTS_FAKE_AUDIO_PATH = os.getenv("TTS_FAKE_AUDIO_PATH", "").strip()
+_tts_fake_audio_b64: str | None = None
 
 _stt_model: WhisperModel | None = None
 _stt_model_lock = asyncio.Lock()
@@ -524,6 +687,14 @@ async def _run_agent_streaming_for_user_text(
                     },
                 )
 
+                # Feed delta into TTS segmenter (Phase 2). Uses fake audio for now.
+                try:
+                    st = _get_tts_state(session_id)
+                    if st.enabled:
+                        await _tts_enqueue_text(session_id=session_id, reply_to=reply_to_message_id, text_delta=delta)
+                except Exception as e:
+                    logger.log(f"tts.enqueue_failed session_id={session_id} err={e!r}")
+
         result = streamed.final_output
 
         dt_ms = int((time.time() - t0) * 1000)
@@ -545,6 +716,14 @@ async def _run_agent_streaming_for_user_text(
             + final_text.replace("\\n", "\\\\n")
         )
 
+
+        # Flush final tail buffer and notify client that TTS for this reply is done.
+        try:
+            st = _get_tts_state(session_id)
+            if st.enabled:
+                await _tts_finalize_reply(session_id=session_id, reply_to=reply_to_message_id)
+        except Exception as e:
+            logger.log(f"tts.finalize_failed session_id={session_id} err={e!r}")
         return assistant_message_id, final_text
 
 
@@ -591,6 +770,43 @@ async def ws_endpoint(ws: WebSocket) -> None:
             continue
 
         msg_type = msg.get("type")
+
+        if msg_type == "voice_output_toggle":
+            # Client -> Server: voice_output_toggle {session_id, enabled}
+            client_session_id = msg.get("session_id")
+            enabled = msg.get("enabled")
+
+            if client_session_id != session_id:
+                await _ws_publish(
+                    session_id,
+                    {
+                        "type": "error",
+                        "message": "session_mismatch",
+                        "expected_session_id": session_id,
+                        "got_session_id": client_session_id,
+                    },
+                )
+                continue
+
+            if not isinstance(enabled, bool):
+                await _ws_publish(session_id, {"type": "error", "message": "invalid_enabled"})
+                continue
+
+            voice_output_enabled_by_session[session_id] = enabled
+
+            st = _get_tts_state(session_id)
+            st.enabled = enabled
+
+            if not enabled:
+                _tts_reset_session(session_id=session_id)
+            else:
+                _tts_maybe_start_worker(session_id=session_id)
+
+            # Optional ack/meta so frontend can reflect server truth.
+            await _ws_publish(session_id, {"type": "meta", "event": "voice_output", "enabled": enabled})
+            logger.log(f"ws.voice_output_toggle enabled={enabled} session_id={session_id}")
+            continue
+
 
         if msg_type == "voice_input":
             message_id = msg.get("message_id")

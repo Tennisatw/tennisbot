@@ -31,6 +31,75 @@
   // Voice payload queued while the socket is not yet bound to the expected session.
   let queuedVoicePayload: any | null = null;
 
+  // Voice output (TTS) toggle (Phase 1/2)
+  let voiceOutputEnabled = false;
+
+  // TTS playback queue
+  let audioQueue: { seq: number; url: string; reply_to: string | null }[] = [];
+  let isPlayingAudio = false;
+  let currentAudioUrl: string | null = null;
+  let audioEl: HTMLAudioElement | null = null;
+
+  function stopAndClearAudioQueue(): void {
+    try {
+      audioEl?.pause();
+    } catch {
+      // ignore
+    }
+    if (currentAudioUrl) {
+      try {
+        URL.revokeObjectURL(currentAudioUrl);
+      } catch {
+        // ignore
+      }
+    }
+    for (const item of audioQueue) {
+      try {
+        URL.revokeObjectURL(item.url);
+      } catch {
+        // ignore
+      }
+    }
+    audioQueue = [];
+    isPlayingAudio = false;
+    currentAudioUrl = null;
+  }
+
+  async function playNextAudio(): Promise<void> {
+    if (isPlayingAudio) return;
+    if (!voiceOutputEnabled) return;
+    if (!audioEl) return;
+    if (audioQueue.length === 0) return;
+
+    const next = audioQueue[0];
+    audioQueue = audioQueue.slice(1);
+
+    isPlayingAudio = true;
+    currentAudioUrl = next.url;
+
+    try {
+      audioEl.src = next.url;
+      await audioEl.play();
+    } catch {
+      // If autoplay is blocked or decode fails, skip.
+      isPlayingAudio = false;
+      currentAudioUrl = null;
+      playNextAudio();
+    }
+  }
+
+  function b64ToBlobUrl(b64: string, mime: string): string | null {
+    try {
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mime });
+      return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
+  }
+
   // Voice input (Phase 1): mic recording -> voice_input ws message.
   let isRecording = false;
   let recorder: MediaRecorder | null = null;
@@ -94,6 +163,8 @@
     await switchSession(sessionId);
   }
 
+
+  // Switching session should stop any current TTS playback.
   async function switchSession(sessionId: string): Promise<void> {
     if (activeSessionId === sessionId && ws && ws.readyState === WebSocket.OPEN) return;
 
@@ -170,11 +241,15 @@
     sock.onclose = () => {
       if (sock !== ws) return;
       status = 'disconnected';
+      stopAndClearAudioQueue();
     };
+      stopAndClearAudioQueue();
     sock.onerror = () => {
       if (sock !== ws) return;
       status = 'disconnected';
+      stopAndClearAudioQueue();
     };
+      stopAndClearAudioQueue();
     sock.onmessage = (ev) => {
       // Drop messages from stale sockets.
       if (sock !== ws) return;
@@ -222,6 +297,37 @@
               // ignore
             }
           }
+          return;
+        }
+
+        if (msg.type === 'meta' && msg.event === 'voice_output' && typeof msg.enabled === 'boolean') {
+          voiceOutputEnabled = msg.enabled;
+          return;
+        }
+
+        if (msg.type === 'tts_audio_segment') {
+          const seq = typeof msg.seq === 'number' ? msg.seq : null;
+          const replyTo = typeof msg.reply_to === 'string' ? msg.reply_to : null;
+          const audioB64 = typeof msg.audio_b64 === 'string' ? msg.audio_b64 : '';
+          const mime = typeof msg.mime === 'string' ? msg.mime : 'audio/mpeg';
+
+          // Keep meta line for debugging.
+          messages = [...messages, { role: 'meta', text: `[tts] segment${seq !== null ? ` #${seq}` : ''}` }];
+
+          if (!voiceOutputEnabled) return;
+          if (!audioB64) return;
+
+          const url = b64ToBlobUrl(audioB64, mime);
+          if (!url) return;
+
+          audioQueue = [...audioQueue, { seq: seq ?? 0, url, reply_to: replyTo }];
+          playNextAudio();
+          return;
+        }
+
+        if (msg.type === 'tts_done') {
+          messages = [...messages, { role: 'meta', text: `[tts] done` }];
+          playNextAudio();
           return;
         }
 
@@ -496,6 +602,27 @@
           End session
         </button>
 
+        <button
+          class={
+            voiceOutputEnabled
+              ? 'px-3 py-1.5 text-sm rounded-lg border border-gray-900 bg-gray-900 text-white'
+              : 'px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50'
+          }
+          title="Voice output"
+          on:click={() => {
+            const next = !voiceOutputEnabled;
+            voiceOutputEnabled = next;
+            if (activeSessionId) {
+              wsSend({ type: 'voice_output_toggle', session_id: activeSessionId, enabled: next });
+            }
+            if (!next) {
+              stopAndClearAudioQueue();
+            }
+          }}
+        >
+          {voiceOutputEnabled ? 'Speaker:On' : 'Speaker:Off'}
+        </button>
+
       <div class="text-base text-gray-500">{status}</div>
       </div>
     </header>
@@ -531,6 +658,8 @@
           {/if}
         {/each}
       </div>
+
+
 
       <footer class="flex gap-2 px-4 py-3 border-t border-gray-200 bg-white sticky bottom-0">
         <textarea

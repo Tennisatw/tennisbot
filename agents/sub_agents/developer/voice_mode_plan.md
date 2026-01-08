@@ -173,3 +173,99 @@ Per session:
 - Mic button records and sends audio; transcript appears as a user message.
 - With voice output enabled, assistant replies are spoken as mp3 segments split by 。！？\n with minimum 16 chars per segment.
 - UI can toggle voice output on/off; toggling off stops playback.
+
+
+## Dev Notes (2026-01-08) - Streaming 已就绪，准备接 Voice Output (TTS)
+
+### Current confirmed streaming hook
+- Backend `web/backend/app.py` has `_run_agent_streaming_for_user_text()` which emits:
+  - `assistant_text_delta { session_id, reply_to, delta }` (per delta)
+  - then `assistant_message { session_id, message_id, reply_to, text }` (final)
+- Frontend `web/frontend/src/App.svelte` already consumes `assistant_text_delta` by appending to an assistant bubble keyed by `reply_to`.
+
+### What to implement next (Voice output)
+1) WS protocol additions (Phase 1/2 compatible)
+- Client -> Server:
+  - `voice_output_toggle { session_id, enabled }`
+- Server -> Client:
+  - `tts_audio_segment { session_id, reply_to, seq, text, audio_b64, mime:"audio/mpeg" }`
+  - `tts_done { session_id, reply_to }`
+
+2) Per-session TTS state (server)
+- `voice_output_enabled: bool`
+- `tts_seq: int`
+- `tts_queue: asyncio.Queue[str]` (waterline max 5 frozen segments)
+- `tail_buffer: str`
+- `tts_worker_task: asyncio.Task | None`
+- `tts_cancel_gen: int` (toggle/disconnect increments; worker drops stale)
+- Optional: `tts_reply_to: str | None` (bind queue to a user message to support stop-on-new-turn)
+
+3) Delta-driven segmenter (Phase 2 target, recommended now)
+- Input: `delta` stream from `assistant_text_delta`.
+- Delimiters: `。！？\n`
+- `min_chars_per_chunk = 16` with short-sentence merge.
+- Backpressure:
+  - if `tts_queue.qsize() >= 5`: append new segment text into `tail_buffer` (do not enqueue)
+  - when `tts_queue.qsize() < 5` and `tail_buffer` non-empty: flush tail_buffer into queue (NO min_chars enforcement on this flush)
+
+4) TTS worker (one per session)
+- Serializes synthesis in enqueue order.
+- On each segment:
+  - run TTS in worker thread/process (do not block event loop)
+  - encode mp3 in-memory
+  - emit `tts_audio_segment`
+- On completion of a reply: emit `tts_done`
+- Cancellation:
+  - toggle off / ws disconnect increments `tts_cancel_gen` and clears queue+tail_buffer.
+
+5) Frontend playback queue
+- Add speaker toggle in header; on toggle send `voice_output_toggle`.
+- Maintain `audioQueue` + single `<audio>` element.
+- On `tts_audio_segment`: base64->Blob URL, push, play sequentially.
+- On toggle off / disconnect / session switch:
+  - stop audio, clear queue, revoke URLs.
+
+### Integration points in backend
+- In ws loop: handle `voice_output_toggle`.
+- On receiving `assistant_text_delta`: if `voice_output_enabled`, feed delta to segmenter.
+- On `assistant_message` end-of-turn: flush remaining buffer (even <16 chars), and emit `tts_done`.
+
+### Known constraints
+- Current EventBus scopes by `session_id` only; include `reply_to` in TTS events so frontend can stop/ignore stale audio.
+- Do not replay audio after reconnect (disconnect clears state).
+
+
+## Patch Log (2026-01-08) - Phase 1 Block #1 (WS toggle + event stubs)
+- Backend `web/backend/app.py`
+  - Add per-session dict `voice_output_enabled_by_session`.
+  - Handle WS message `voice_output_toggle` with session_id check and enabled bool validation.
+  - Emit `meta {event:"voice_output", enabled}` as ack.
+- Frontend `web/frontend/src/App.svelte`
+  - Add header Speaker toggle button; sends `voice_output_toggle`.
+  - Consume `meta voice_output` to sync UI state.
+  - Add placeholders for `tts_audio_segment` and `tts_done` (currently just prints meta lines).
+
+
+## Patch Log (2026-01-08) - Phase 1 Block #2 (Backend delta segmenter + TTS worker, fake audio)
+- Backend `web/backend/app.py`
+  - Add `TtsSessionState` + `tts_state_by_session` + helpers:
+    - `_tts_split_flushable_segments` (delims 。！？\n, min_chars=16)
+    - `_tts_enqueue_text` (delta-driven, waterline 5 + tail_buffer)
+    - `_tts_finalize_reply` (flush remaining + emit tts_done)
+    - `_tts_maybe_start_worker` (one worker per session; emits `tts_audio_segment` with fake `audio_b64=""`)
+    - `_tts_reset_session` (toggle off cleanup)
+  - Hook TTS enqueue into `_run_agent_streaming_for_user_text()` right after each `assistant_text_delta` publish.
+  - On end of streaming, call `_tts_finalize_reply()`.
+  - Update `voice_output_toggle` handler to also update `TtsSessionState.enabled` and start/stop worker.
+
+
+## Patch Log (2026-01-08) - Phase 1 Block #3 (Frontend playback queue + server fake-audio injection)
+- Backend `web/backend/app.py`
+  - Add env `TTS_FAKE_AUDIO_PATH` (if set, load mp3 bytes -> base64 and send as `tts_audio_segment.audio_b64`).
+  - Cache `_tts_fake_audio_b64` in memory.
+  - NOTE: `tts_audio_segment` now sends `audio_b64: audio_b64` (was always empty).
+- Frontend `web/frontend/src/App.svelte`
+  - Add `audioQueue` + single `<audio>` element.
+  - On `tts_audio_segment`: base64->Blob URL enqueue; play sequentially.
+  - On `ended/error`: auto play next; revoke object URLs.
+  - On speaker off / ws disconnect: stop + clear queue.
