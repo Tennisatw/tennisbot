@@ -14,6 +14,9 @@ from faster_whisper import WhisperModel
 import dotenv
 from agents import Runner
 from openai.types.responses import ResponseTextDeltaEvent
+# OpenAI TTS (for real voice output)
+from openai import OpenAI
+
 
 
 from src.jsonl_session import JsonlSession
@@ -27,7 +30,9 @@ from src.settings import settings
 from src.logger import current_session_id, logger
 from src.session_archive import archive_session_store
 
-TTS_FAKE_AUDIO_PATH="data/temp/y2294.mp3"
+# Voice output (TTS) debug: if set, server will send this mp3 payload for every tts_audio_segment.
+# Prefer setting env var `TTS_FAKE_AUDIO_PATH` instead of hardcoding.
+TTS_FAKE_AUDIO_PATH = ""
 dotenv.load_dotenv()
 
 logger.setup()
@@ -324,18 +329,24 @@ def _tts_maybe_start_worker(*, session_id: str) -> None:
             seq = st.seq
             reply_to = st.reply_to
 
-            global _tts_fake_audio_b64
+            # Prefer fake audio when configured (debug), otherwise call OpenAI TTS.
             audio_b64 = ""
-            if TTS_FAKE_AUDIO_PATH:
-                try:
+
+            try:
+                if TTS_FAKE_AUDIO_PATH:
+                    global _tts_fake_audio_b64
                     if _tts_fake_audio_b64 is None:
                         with open(TTS_FAKE_AUDIO_PATH, "rb") as f:
                             _tts_fake_audio_b64 = base64.b64encode(f.read()).decode("ascii")
                     audio_b64 = _tts_fake_audio_b64 or ""
-                except Exception as e:
-                    logger.log(f"tts.fake_audio_load_failed path={TTS_FAKE_AUDIO_PATH} err={e!r}")
-
-            # Fake TTS for now: send empty audio payload.
+                else:
+                    client = await _get_tts_client()
+                    mp3_bytes = await asyncio.to_thread(_tts_synthesize_mp3_bytes_sync, client=client, text=seg)
+                    if mp3_bytes:
+                        audio_b64 = base64.b64encode(mp3_bytes).decode("ascii")
+            except Exception as e:
+                logger.log(f"tts.synthesize_failed session_id={session_id} err={e!r}")
+                audio_b64 = ""
             await _ws_publish(
                 session_id,
                 {
@@ -442,6 +453,67 @@ VOICE_DEBUG_DUMP_DIR = "data/voice_debug"
 # Voice output (TTS) debug: if set, server will send this mp3 payload for every tts_audio_segment.
 # Example: TTS_FAKE_AUDIO_PATH=data/temp/y2294.mp3
 _tts_fake_audio_b64: str | None = None
+# --- OpenAI TTS client (sync) ---
+_tts_client: OpenAI | None = None
+_tts_client_lock = asyncio.Lock()
+
+
+async def _get_tts_client() -> OpenAI:
+    """Get singleton OpenAI client for TTS.
+
+    Notes:
+        - Keep it separate from `agents.Runner`.
+        - Uses OPENAI_API_KEY from env.
+    """
+
+    global _tts_client
+    if _tts_client is not None:
+        return _tts_client
+
+    async with _tts_client_lock:
+        if _tts_client is not None:
+            return _tts_client
+        _tts_client = OpenAI()
+        return _tts_client
+
+
+def _tts_synthesize_mp3_bytes_sync(*, client: OpenAI, text: str) -> bytes:
+    """Synthesize mp3 bytes for a segment.
+
+    Default:
+        - model: gpt-4o-mini-tts
+        - voice: alloy
+        - format: mp3
+
+    Runs in a worker thread.
+    """
+
+    # Defensive: avoid empty calls.
+    t = (text or "").strip()
+    if not t:
+        return b""
+
+    # New OpenAI Python SDK: audio.speech.create
+    audio = client.audio.speech.create(
+        model=os.getenv("TTS_MODEL", "gpt-4o-mini-tts"),
+        voice=os.getenv("TTS_VOICE", "marin"),
+        input=t,
+        response_format="mp3",
+        speed=1.2,
+    )
+
+    # `audio` can be a Response-like object; `read()` is supported in many SDK examples.
+    # Fall back to `.content` if present.
+    if hasattr(audio, "read"):
+        return audio.read()
+    if hasattr(audio, "content"):
+        return audio.content  # type: ignore
+    # Last resort: bytes(...) if it behaves like a buffer.
+    try:
+        return bytes(audio)  # type: ignore
+    except Exception:
+        return b""
+
 
 _stt_model: WhisperModel | None = None
 _stt_model_lock = asyncio.Lock()

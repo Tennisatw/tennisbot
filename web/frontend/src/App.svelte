@@ -29,6 +29,9 @@
   let queuedText: string | null = null;
 
   // Voice payload queued while the socket is not yet bound to the expected session.
+  // Voice output toggle queued while the socket is not yet bound to the expected session.
+  let queuedVoiceOutputEnabled: boolean | null = null;
+
   let queuedVoicePayload: any | null = null;
 
   // Voice output (TTS) toggle (Phase 1/2)
@@ -310,6 +313,19 @@
           }
 
           // Flush queued voice payload after socket is bound.
+          // Flush queued voice output toggle after socket is bound.
+          if (queuedVoiceOutputEnabled !== null) {
+            const enabled = queuedVoiceOutputEnabled;
+            queuedVoiceOutputEnabled = null;
+            try {
+              sock.send(
+                JSON.stringify({ type: 'voice_output_toggle', session_id: activeSessionId, enabled })
+              );
+            } catch {
+              // ignore
+            }
+          }
+
           if (queuedVoicePayload) {
             const payload = queuedVoicePayload;
             queuedVoicePayload = null;
@@ -634,9 +650,18 @@
           on:click={() => {
             const next = !voiceOutputEnabled;
             voiceOutputEnabled = next;
-            if (activeSessionId) {
-              wsSend({ type: 'voice_output_toggle', session_id: activeSessionId, enabled: next });
+
+            if (!activeSessionId) return;
+
+            // If the socket is not yet bound, queue the toggle and (re)connect.
+            if (!ws || ws.readyState !== WebSocket.OPEN || wsSessionId !== activeSessionId) {
+              queuedVoiceOutputEnabled = next;
+              connect(activeSessionId);
+              if (!next) stopAndClearAudioQueue();
+              return;
             }
+
+            wsSend({ type: 'voice_output_toggle', session_id: activeSessionId, enabled: next });
             if (!next) {
               stopAndClearAudioQueue();
             }
