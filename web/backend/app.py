@@ -372,10 +372,9 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 "type": "assistant_message",
                 # Link this assistant message to the triggering user message.
                 # Frontend uses this to clear precise pending state.
-                "in_reply_to": message_id,
                 "message_id": assistant_id,
-                "parent_id": message_id,
+                "reply_to": message_id,
                 "text": assistant_text,
             },
         )
-        logger.log(f"ws.sent assistant_message id={assistant_id} parent_id={message_id}")
+        logger.log(f"ws.sent assistant_message id={assistant_id} reply_to={message_id}")

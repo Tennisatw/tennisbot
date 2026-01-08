@@ -93,14 +93,14 @@ Per session:
 - Somewhere in header or toolbar:
   - Speaker button (toggle): enable/disable voice output.
 
-### Recording (Phase 1)
+### Recording
 - MediaRecorder -> collect chunks -> on stop, send as **one payload** via WS message `voice_input`.
 - After stop:
-  - Generate a stable `client_msg_id` for the placeholder message.
-  - Include `client_msg_id` in the `voice_input` request.
-  - Server echoes `client_msg_id` in `transcript_final` so the client can replace the correct placeholder.
+  - Generate a stable `message_id` for the placeholder message.
+  - Include `message_id` in the `voice_input` request.
+  - Server echoes `message_id` in `transcript_final` so the client can replace the correct placeholder.
 
-  - Immediately insert a **placeholder user message** with `status=transcribing`.
+  - Immediately insert a **placeholder user message** with `transcribing`.
   - When `transcript_final` arrives, **replace** the placeholder content with transcript text.
 
 ### Playback
