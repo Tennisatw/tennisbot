@@ -412,6 +412,51 @@ def _b64decode_audio(*, audio_b64: str) -> bytes:
     return data
 
 
+
+async def _run_agent_for_user_text(*, session_id: str, message_id: str, user_text: str) -> str:
+    """Run agent for a user text and return assistant final text.
+
+    Notes:
+        - Serialized by per-session lock to avoid concurrent mutation.
+        - Persists last_agent back to agents_by_session.
+    """
+
+    async with _get_run_lock(session_id):
+        current_agent = agents_by_session.get(session_id)
+        if current_agent is None:
+            current_agent = _new_session_agent()
+            agents_by_session[session_id] = current_agent
+
+        t0 = time.time()
+        logger.log(
+            "ws.runner.start "
+            + f"id={message_id} agent={getattr(current_agent, 'name', None)} "
+            + f"model={getattr(current_agent, 'model', None)} key_set={bool(os.getenv('OPENAI_API_KEY'))}"
+        )
+
+        session = JsonlSession(session_id, path=str(SESSIONS_DIR / f"{session_id}.jsonl"))
+        result = await Runner.run(
+            current_agent,
+            user_text,
+            session=session,  # type: ignore
+            max_turns=settings.default_max_turns,
+        )
+        dt_ms = int((time.time() - t0) * 1000)
+        logger.log(f"ws.runner.done id={message_id} ms={dt_ms}")
+
+        last_agent = getattr(result, "last_agent", None)
+        if last_agent is not None:
+            agents_by_session[session_id] = last_agent
+
+        assistant_text = str(getattr(result, "final_output", ""))
+        logger.log(
+            "chat role=assistant name="
+            + getattr(agents_by_session[session_id], "name", "Agent")
+            + " output="
+            + assistant_text.replace("\\n", "\\\\n")
+        )
+        return assistant_text
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     """WebSocket endpoint.
@@ -541,6 +586,32 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 },
             )
             logger.log(f"ws.sent transcript_final reply_to={message_id}")
+
+            # Enter normal chat flow using the transcript as user input.
+            try:
+                await _ws_publish(session_id, {"type": "ack", "message_id": message_id, "queue_pos": 0})
+
+                assistant_text = await _run_agent_for_user_text(
+                    session_id=session_id,
+                    message_id=message_id,
+                    user_text=transcript,
+                )
+            except Exception as e:
+                logger.log(f"ws.runner.error id={message_id} err={e!r}")
+                await _ws_publish(session_id, {"type": "error", "message": "runner_failed", "detail": repr(e)})
+                continue
+
+            assistant_id = str(uuid.uuid4())
+            await _ws_publish(
+                session_id,
+                {
+                    "type": "assistant_message",
+                    "message_id": assistant_id,
+                    "reply_to": message_id,
+                    "text": assistant_text,
+                },
+            )
+            logger.log(f"ws.sent assistant_message id={assistant_id} reply_to={message_id}")
             continue
 
         if msg_type != "user_message":
@@ -554,42 +625,11 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
         user_text = msg.get("text", "")
         try:
-            # Serialize agent runs to avoid concurrent mutation of per-session agent state.
-            async with _get_run_lock(session_id):
-                current_agent = agents_by_session.get(session_id)
-                if current_agent is None:
-                    current_agent = _new_session_agent()
-                    agents_by_session[session_id] = current_agent
-
-                t0 = time.time()
-                logger.log(
-                    "ws.runner.start "
-                    + f"id={message_id} agent={getattr(current_agent, 'name', None)} "
-                    + f"model={getattr(current_agent, 'model', None)} key_set={bool(os.getenv('OPENAI_API_KEY'))}"
-                )
-
-                session = JsonlSession(session_id, path=str(SESSIONS_DIR / f"{session_id}.jsonl"))
-                result = await Runner.run(
-                    current_agent,
-                    user_text,
-                    session=session, # type: ignore
-                    max_turns=settings.default_max_turns,
-                )
-                dt_ms = int((time.time() - t0) * 1000)
-                logger.log(f"ws.runner.done id={message_id} ms={dt_ms}")
-
-                last_agent = getattr(result, "last_agent", None)
-                if last_agent is not None:
-                    # Persist last_agent to keep tool/handoff state across turns in this session.
-                    agents_by_session[session_id] = last_agent
-
-                assistant_text = str(getattr(result, "final_output", ""))
-                logger.log(
-                    "chat role=assistant name="
-                    + getattr(agents_by_session[session_id], "name", "Agent")
-                    + " output="
-                    + assistant_text.replace("\\n", "\\\\n")
-                )
+            assistant_text = await _run_agent_for_user_text(
+                session_id=session_id,
+                message_id=message_id,
+                user_text=user_text,
+            )
         except Exception as e:
             logger.log(f"ws.runner.error id={message_id} err={e!r}")
             await _ws_publish(session_id, {"type": "error", "message": "runner_failed", "detail": repr(e)})
