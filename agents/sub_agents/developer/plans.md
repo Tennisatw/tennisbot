@@ -7,7 +7,3 @@
 <br>
 
 补充test
-
-<br>
-
-如果第一条消息就是语音消息的话，[system] socket not bound, cannot send

@@ -276,7 +276,7 @@ async def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
 
 
 VOICE_INPUT_MAX_BYTES = 20 * 1024 * 1024
-VOICE_STT_MODEL_SIZE = "small"
+VOICE_STT_MODEL_SIZE = "medium"
 VOICE_DEBUG_DUMP_DIR = "data/voice_debug"
 
 _stt_model: WhisperModel | None = None
