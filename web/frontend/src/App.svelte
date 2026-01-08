@@ -27,6 +27,12 @@
   // Text queued while the socket is not yet bound to the expected session.
   let queuedText: string | null = null;
 
+  // Voice input (Phase 1): mic recording -> voice_input ws message.
+  let isRecording = false;
+  let recorder: MediaRecorder | null = null;
+  let recordChunks: BlobPart[] = [];
+  let recordStream: MediaStream | null = null;
+
   // Markdown rendering is sanitized before injecting into DOM.
   marked.setOptions({
     gfm: true,
@@ -224,6 +230,14 @@
           messages = [...messages, { role: 'assistant', text: msg.text }];
           return;
         }
+
+        if (msg.type === 'transcript_final' && typeof msg.message_id === 'string' && typeof msg.text === 'string') {
+          // Replace placeholder user message by message_id.
+          messages = messages.map((m) =>
+            m.role === 'user' && m.id === msg.message_id ? { ...m, text: msg.text, status: 'sent' } : m
+          );
+          return;
+        }
         if (msg.type === 'user_message' && typeof msg.text === 'string') {
           messages = [...messages, { role: 'user', text: msg.text, status: 'sent' }];
           return;
@@ -243,6 +257,101 @@
         // ignore
       }
     };
+  }
+
+
+  function wsSend(payload: any): void {
+    if (!activeSessionId) return;
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      messages = [...messages, { role: 'meta', text: '[system] disconnected, cannot send' }];
+      return;
+    }
+
+    if (wsSessionId !== activeSessionId) {
+      messages = [...messages, { role: 'meta', text: '[system] socket not bound, cannot send' }];
+      return;
+    }
+
+    ws.send(JSON.stringify(payload));
+  }
+
+  async function startRecording(): Promise<void> {
+    if (isRecording) return;
+
+    recordChunks = [];
+    recordStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const mr = new MediaRecorder(recordStream);
+    recorder = mr;
+
+    mr.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordChunks.push(e.data);
+    };
+
+    mr.onstop = async () => {
+      try {
+        const blob = new Blob(recordChunks, { type: mr.mimeType || undefined });
+        const mime = blob.type || mr.mimeType || 'application/octet-stream';
+
+        const messageId = newId();
+        // Insert placeholder user message.
+        messages = [...messages, { role: 'user', id: messageId, status: 'pending', text: '(transcribing...)' }];
+
+        const audio_b64 = await blobToBase64(blob);
+        wsSend({ type: 'voice_input', session_id: activeSessionId, message_id: messageId, audio_b64, mime });
+      } catch {
+        messages = [...messages, { role: 'meta', text: '[system] voice record failed' }];
+      } finally {
+        // Cleanup stream.
+        if (recordStream) {
+          for (const t of recordStream.getTracks()) t.stop();
+        }
+        recordStream = null;
+        recorder = null;
+        recordChunks = [];
+        isRecording = false;
+      }
+    };
+
+    mr.start();
+    isRecording = true;
+  }
+
+  function stopRecording(): void {
+    if (!isRecording) return;
+    try {
+      recorder?.stop();
+    } catch {
+      // ignore
+    }
+  }
+
+  async function toggleRecording(): Promise<void> {
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+    try {
+      await startRecording();
+    } catch {
+      messages = [...messages, { role: 'meta', text: '[system] mic permission denied' }];
+      isRecording = false;
+    }
+  }
+
+  function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('read_failed'));
+      reader.onload = () => {
+        const s = String(reader.result || '');
+        // data:<mime>;base64,<payload>
+        const idx = s.indexOf(',');
+        resolve(idx >= 0 ? s.slice(idx + 1) : s);
+      };
+      reader.readAsDataURL(blob);
+    });
   }
 
   function newId(): string {
@@ -378,6 +487,17 @@
             }
           }}
         ></textarea>
+        <button
+          class={
+            isRecording
+              ? 'px-4 py-2 text-base rounded-xl border border-red-700 bg-red-700 text-white'
+              : 'px-4 py-2 text-base rounded-xl border border-gray-300 bg-white text-gray-900'
+          }
+          on:click={() => toggleRecording()}
+          title="Voice input"
+        >
+          {isRecording ? 'Stop' : 'Voice'}
+        </button>
         <button
           class="px-4 py-2 text-base rounded-xl border border-gray-900 bg-gray-900 text-white"
           on:click={send}

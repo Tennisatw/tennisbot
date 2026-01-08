@@ -10,4 +10,4 @@
 
 <br>
 
-一个会话中的工具调用，会显示在另一个会话中
+如果第一条消息就是语音消息的话，[system] socket not bound, cannot send

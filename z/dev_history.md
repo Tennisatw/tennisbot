@@ -128,3 +128,7 @@ WebUI基本上开发得差不多了，不过还有一个大bug：http://10.0.0.3
 2026.01.05:
 
 新增 edit_apply 工具，弃用 draft_patch 和 apply_patch 工具，因为失败率高。
+
+<br>
+
+    uv add faster-whisper
