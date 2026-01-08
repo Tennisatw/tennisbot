@@ -277,6 +277,7 @@ async def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
 
 VOICE_INPUT_MAX_BYTES = 20 * 1024 * 1024
 VOICE_STT_MODEL_SIZE = "small"
+VOICE_DEBUG_DUMP_DIR = "data/voice_debug"
 
 _stt_model: WhisperModel | None = None
 _stt_model_lock = asyncio.Lock()
@@ -302,9 +303,10 @@ async def _get_stt_model() -> WhisperModel:
         # If you have NVIDIA GPU, faster-whisper will use CUDA when available.
         _stt_model = WhisperModel(
             VOICE_STT_MODEL_SIZE,
-            device="cpu",
-            compute_type="int8",
+            device="cuda",
+            compute_type="float16",
         )
+        logger.log(f"stt.model_loaded size={VOICE_STT_MODEL_SIZE} device=cuda compute_type=float16")
         return _stt_model
 
 
@@ -374,8 +376,8 @@ def _stt_transcribe_sync(*, wav_bytes: bytes) -> str:
             # Fallback: create model sync if called before async getter.
             model = WhisperModel(
                 VOICE_STT_MODEL_SIZE,
-                device="cpu",
-                compute_type="int8",
+                device="cuda",
+                compute_type="float16",
             )
             globals()["_stt_model"] = model
 
@@ -493,6 +495,20 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 continue
 
             logger.log(f"ws.voice_input audio_bytes={len(audio_bytes)} mime={mime}")
+
+            # Debug: dump raw browser audio payload for inspection.
+            # try:
+            #     os.makedirs(VOICE_DEBUG_DUMP_DIR, exist_ok=True)
+            #     raw_path = os.path.join(VOICE_DEBUG_DUMP_DIR, f"{message_id}.input")
+            #     meta_path = os.path.join(VOICE_DEBUG_DUMP_DIR, f"{message_id}.meta.txt")
+            #     with open(raw_path, "wb") as f:
+            #         f.write(audio_bytes)
+            #     with open(meta_path, "w", encoding="utf-8") as f:
+            #         f.write(f"mime={mime}\n")
+            #         f.write(f"bytes={len(audio_bytes)}\n")
+            #     logger.log(f"ws.voice_input.dumped path={raw_path}")
+            # except Exception as e:
+            #     logger.log(f"ws.voice_input.dump_failed id={message_id} err={e!r}")
 
             try:
                 # Ensure model is loaded (async-safe) before running heavy work.
