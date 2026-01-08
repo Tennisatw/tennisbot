@@ -499,7 +499,7 @@ def _tts_synthesize_mp3_bytes_sync(*, client: OpenAI, text: str) -> bytes:
         voice=os.getenv("TTS_VOICE", "marin"),
         input=t,
         response_format="mp3",
-        speed=1.2,
+        speed=1.1,
     )
 
     # `audio` can be a Response-like object; `read()` is supported in many SDK examples.
