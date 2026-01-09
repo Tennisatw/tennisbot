@@ -461,3 +461,13 @@ prompt: 依据时间顺序，记录 Tennisbot 的开发过程，包括时间线�
   - Server → Client：`tts_audio_segment {session_id, reply_to, seq, text, audio_b64, mime:"audio/mpeg"}`、`tts_done {session_id, reply_to}`。
 - 后端架构要点：每 session 一个 TTS worker；串行合成保证顺序；toggle off / disconnect 需要取消并清空队列，不做断线重放。
 - 使用 openai的 TTS API
+
+## 2026.01.09（补记：在高强度日程下仍推进开发）
+- 上午 11:00-12:00 与 Reza 开会。
+- 下午送快递到 21:00，晚上继续开发 Tennisbot。
+- 同期个人假期计划被大幅压缩：原本预计将近一个月，实际真正休假约 3-4 天。
+
+## 2026.01.08（补记：时间被现实任务挤占；假期预期落差）
+- 原计划 2025.12.15-2026.01.15 基本空出来。
+- 实际被送快递、修车等现实事务占用很多；其余空余时间大量投入 Tennisbot 开发。
+- 对假期缩水有点小不爽；计划过两天好好休息。
