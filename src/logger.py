@@ -12,7 +12,7 @@ current_session_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 
 
-def _normalize_value(v, *, max_len: int | None = None):
+def _normalize_value(v, *, max_len: int | None = 10000):
     """Normalize log field values.
 
     - Replace newlines with literal "\\n".
@@ -128,8 +128,8 @@ class Logger:
     def log(self, message: str) -> None:
         """Log a message."""
         self._ensure_today_file()
-        logging.getLogger(self.name).info(message)
-        print(message if len(message) < 80 else message[:77] + "...")
+        logging.getLogger(self.name).info(_normalize_value(message))
+        print(message if len(message) < 90 else message[:87] + "...")
 
     async def emit(self, payload: dict[str, Any]) -> None:
         """Emit a structured event.
