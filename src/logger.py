@@ -12,7 +12,7 @@ current_session_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 
 
-def _normalize_value(v, *, max_len: int | None = 100):
+def _normalize_value(v, *, max_len: int | None = None):
     """Normalize log field values.
 
     - Replace newlines with literal "\\n".

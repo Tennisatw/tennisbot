@@ -2,7 +2,7 @@
     "name": "Tennisbot",
     "lang": "zh-CN",
 
-    "default_max_turns": 20,
+    "default_max_turns": 30,
 
     "default_ignore": [
         ".env",
