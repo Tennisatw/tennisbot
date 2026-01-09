@@ -135,7 +135,6 @@ class Logger:
         """Emit a structured event.
 
         Notes:
-            - Default behavior is to log it as a single line.
             - Web backends will monkey-patch this method to forward events.
         """
 
@@ -143,7 +142,7 @@ class Logger:
         if isinstance(sid, str) and sid and "session_id" not in payload:
             payload = {**payload, "session_id": sid}
 
-        self.log(f"event {payload}")
+        pass
 
 
 logger = Logger()
