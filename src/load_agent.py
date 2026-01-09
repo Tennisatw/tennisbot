@@ -1,32 +1,79 @@
 import os
 import json
 import importlib
+import frontmatter
+import random
 
 from agents import Agent, ModelSettings
 from agents import handoff
 from src.logger import logger
+from src.settings import settings
 from src.tools import *
 
 
-# class LoggedOpenaiTool:
-#     """A thin wrapper to log every openai tool call."""
+def prompt_replace(prompt: str):
+    if "<NAME>" in prompt:
+        prompt = prompt.replace("<NAME>", settings.name)
+    
+    if "<DEFAULT_PROMPT>" in prompt:
+        default_prompt = "\n".join(settings.default_prompt)
+        prompt = prompt.replace("<DEFAULT_PROMPT>", default_prompt)
 
-#     def __init__(self, inner):
-#         self._inner = inner
+    if "<ROOT_PATH>" in prompt:
+        ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        prompt = prompt.replace("<ROOT_PATH>", ROOT_PATH)
 
-#     @property
-#     def name(self) -> str:
-#         return getattr(self._inner, "name", self._inner.__class__.__name__)
+    if "<PREVIOUS_CONV_SUMMARY>" in prompt:
+        summary = ""
+        n_summaries = 10
+        try:
+            files = sorted(os.listdir("data/session_summaries"), reverse=True)
+            for index, f in enumerate(files):
+                if index >= n_summaries:
+                    break
+                summary_file = os.path.join("data/session_summaries", f)
+                with open(summary_file, "r", encoding="utf-8") as sf:
+                    prev_summary = sf.read()
+                    summary = prev_summary + "\n" + summary
 
-#     def __getattr__(self, item):
-#         return getattr(self._inner, item)
+            prompt = prompt.replace("<PREVIOUS_CONV_SUMMARY>", summary)
+        except Exception:
+            prompt = prompt.replace("<PREVIOUS_CONV_SUMMARY>", "")
 
-#     async def __call__(self, *args, **kwargs):
-#         logger.log(f"tool.call {self.name} args={args} kwargs={kwargs}")
-#         res = self._inner(*args, **kwargs)
-#         if inspect.isawaitable(res):
-#             return await res
-#         return res
+    if "<CURRENT_MOOD>" in prompt:
+        # Valence, Arousal, Stress, Energy
+        # 愉快程度，亢奋程度，压力值，精力值
+        valence = random.randint(2, 8)
+        arousal = random.randint(2, 8)
+        stress = random.randint(2, 8)
+        energy = random.randint(2, 8)
+        mood_str = f"Valence:{valence}, Arousal:{arousal}, Stress:{stress}, Energy:{energy} (out of 10)"
+        prompt = prompt.replace("<CURRENT_MOOD>", mood_str)
+
+    if "<DEVELOPER_MD_FILES>" in prompt:
+        developer_md_contents = ''
+        for file in os.listdir("agents/sub_agents/developer"):
+            file_path = os.path.join("agents/sub_agents/developer", file)
+            if file.endswith(".md") and file != "agent.md" and not file.startswith("_"):
+                post = frontmatter.load(file_path)
+                title = post.get("title", file)
+                abstract = post.get("abstract", "No Abstract")
+                developer_md_contents += f"{title}: {abstract}\n"
+        prompt = prompt.replace("<DEVELOPER_MD_FILES>", developer_md_contents)
+
+    if "<RECORDER_MD_FILES>" in prompt:
+        recorder_md_contents = ''
+        for file in os.listdir("agents/sub_agents/recorder"):
+            file_path = os.path.join("agents/sub_agents/recorder", file)
+            if file.endswith(".md") and file != "agent.md" and not file.startswith("_"):
+                post = frontmatter.load(file_path)
+                title = post.get("title", file)
+                abstract = post.get("abstract", "No Abstract")
+                recorder_md_contents += f"{title}: {abstract}\n"
+        prompt = prompt.replace("<RECORDER_MD_FILES>", recorder_md_contents)
+
+    return prompt
+
 
 def load_agent_tools(tool_names):
 
@@ -62,26 +109,12 @@ def load_main_agent():
         tools = load_agent_tools(agent_config.get("tools", []))
         temperature = agent_config.get("temperature", 1.0)
 
-    ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     with open("agents/agent.md", "r", encoding="utf-8") as f:
-        instructions = f.read().replace("<ROOT_PATH>", ROOT_PATH)
+        instructions = prompt_replace(f.read())
+        print("Loaded main agent: Tennisbot")
+        print(instructions)
 
     # Inject summaries of previous conversations into <PREVIOUS_CONV_SUMMARY>
-    summary = ""
-    n_summaries = 10
-    try:
-        files = sorted(os.listdir("data/session_summaries"), reverse=True)
-        for index, f in enumerate(files):
-            if index >= n_summaries:
-                break
-            summary_file = os.path.join("data/session_summaries", f)
-            with open(summary_file, "r", encoding="utf-8") as sf:
-                prev_summary = sf.read()
-                summary = prev_summary + "\n" + summary
-
-        instructions = instructions.replace("<PREVIOUS_CONV_SUMMARY>", summary)
-    except Exception:
-        instructions = instructions.replace("<PREVIOUS_CONV_SUMMARY>", "")
 
     agent = Agent(
         name="Tennisbot",
@@ -98,8 +131,6 @@ def load_main_agent():
 
 def load_sub_agents(handoffs):
     # Dynamically load sub-agents from agents/sub_agents/
-
-    ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     sub_agents = []
     for dirs in os.listdir("agents/sub_agents"):
@@ -119,7 +150,9 @@ def load_sub_agents(handoffs):
 
             temperature = agent_config.get("temperature", 0.5)
         with open(os.path.join(dir_path, "agent.md"), "r", encoding="utf-8") as f:
-            instructions = f.read().replace("<ROOT_PATH>", ROOT_PATH)
+            instructions = prompt_replace(f.read())
+            print(f"Loaded sub-agent: Tennisbot the {dirs}")
+            print(instructions)
 
             sub_agents.append(Agent(
                 name="Tennisbot the " + dirs,

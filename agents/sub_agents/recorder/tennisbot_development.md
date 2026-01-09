@@ -1,6 +1,7 @@
 ---
-任务说明：
-- 依据时间顺修，记录 Tennisbot 的开发过程，包括时间线、设计想法、目标与架构等内容。
+title: Tennisbot 开发记录
+abstract: 记录 Tennisbot 的开发过程
+prompt: 依据时间顺序，记录 Tennisbot 的开发过程，包括时间线、设计想法、目标与架构等内容。需要时，主动询问用户补充细节。
 ---
 
 # Tennisbot 开发记录
@@ -261,6 +262,32 @@
   - 一旦改出严重 bug 导致系统无法对话，就没法继续让 developer 修复，甚至连回滚都困难。
 - 暂时解决方案：使用 GitHub 做备份；出现严重 bug 时通过回滚恢复。
 
+## 2026.01.02（WebUI：runtime events 推送到前端；渲染 meta 行）
+- 目标：通过 WebSocket 把 server-side runtime events（tool calls / agent handoffs）实时推送到 WebUI；同时优化聊天渲染与排版。
+
+### 后端（src/logger.py / web/backend/app.py）
+- `src/logger.py`
+  - 强化 `@logged_tool`：在 tool 执行前/后/报错时发结构化事件：`tool_call` + `phase(start/end/error)`，并带 `elapsed_ms` / `error` 等信息。
+  - 新增 `Logger.emit(payload)`：作为结构化事件出口（默认仍可单行日志）。
+- `web/backend/app.py`
+  - 新增 in-process `EventBus`（async queue + broadcast loop），向所有 WS client 广播事件。
+  - 将 `logger.emit` 接到 `event_bus.publish`：tool/agent 事件可直接推到 WebUI。
+  - WS connect/disconnect 时注册/注销 client。
+
+### 前端（web/frontend/src/App.svelte）
+- 新增 `role: 'meta'` 消息类型：
+  - `tool_call` 事件渲染为 meta 行（非气泡）。
+  - `agent_handoff` 事件渲染为 meta 行（如 `[handoff] -> <agent>`）。
+  - meta 行加粗（`font-semibold`）。
+- Markdown/排版：
+  - markdown 规范化：把 3+ 连续换行压到 2（减少空白）。
+  - user 消息也支持 markdown；深色背景下用 `prose-invert` 保证可读性。
+  - 字号整体调大；行高用 `leading-snug` 收紧。
+
+### 备注 / follow-ups
+- 主题色实验做过但后来被用户回滚。
+- 若 Pylance 因 `@dataclass(frozen=True)` 报错（给 `logger.emit` 赋值），可考虑 `object.__setattr__` 或移除 `frozen`。
+
 ### 2026.01.02-03（multi-session：对标 ChatGPT；为长任务并行做准备）
 - multi-session 也是从项目最开始就想做的能力，目标对标 OpenAI 的 ChatGPT 产品形态。
 - 动机：考虑到未来会有很多**长时间任务**，不能让“一个任务卡死”影响其他任务/对话。
@@ -272,6 +299,26 @@
   - 存在线程不安全风险。
   - 且其能力可被 `run_shell` 覆盖（`run_python` 能做的基本都能用 `run_shell` 完成）。
 
+## 2026.01.04（WebUI：multi-session 模式落地；每个 session 独立 DB）
+- 目标：把 Tennisbot 的 WebUI 变成类似 ChatGPT/微信的多会话形态：可创建多个 session、侧边栏切换、一次只展示一个会话。
+
+### 存储方案
+- 每个 session 一个 SQLite DB：`data/sessions/<session_id>.db`。
+- session 索引：`data/sessions/index.json`。
+- `session_id`：用 Unix epoch 毫秒（字符串）。同一毫秒内重复点两次 New session 只创建一个（去重）。
+- 启动时以磁盘上的 `data/sessions/*.db` 为准：扫描 DB 文件并重建/修复 `index.json`；尽量保留 `active_session_id`。
+
+### UI/UX（前端）
+- 两栏布局：左侧 sidebar 列 session 列表（暂时用 session_id 当名字），右侧复用现有 chat UI。
+- sidebar 提供 **New session**：`POST /api/sessions` 创建后自动切换。
+- chat 页提供 **End session**（前端占位）：关闭 WS、清空 chat state，右侧显示空白/欢迎页；左侧 sidebar 仍保留，点任意 session 可恢复聊天。
+- “No session” 语义：磁盘上没有 DB 文件时，自动创建/加载默认 session。
+- 延后项：End session 未来应归档并删除 session DB；暂不在 UI 做 archived 状态。
+
+### 后端 API / 行为（FastAPI）
+- `POST /api/sessions`：创建 session，并预热该 session 的 agent bundle（`agents_by_session[session_id] = _new_session_agent()`）。
+- `PUT /api/sessions/{session_id}/active`：把 active session 持久化到 `index.json`。
+- `GET /api/messages`：支持 `session_id` query param（按 session 拉历史）。
 
 ### 2026.01.05：
   - 新增 `edit_apply` 工具，作为 developer 日常改代码的主力工具；上线后代码改动失败率显著下降。
@@ -364,4 +411,53 @@
   - match 尽量短，并从 read_file 直接复制源片段，减少手打差异。
   - 插入注释/控制流（try/except/with/if）附近尤其要检查换行与缩进，否则容易 SyntaxError。
 
-备注：用户最后要求“不要再修改代码，只记录总结”，因此此条为会话总结记录。
+## 2026.01.08（WebUI：Streaming 输出协议与落地要点备忘）
+- 目标：WebUI 支持 assistant 边生成边显示：后端通过 WS 推 `assistant_text_delta`，结束时再推 `assistant_message_final` 收口气泡。
+
+### 前端现状（web/frontend/src/App.svelte）
+- 已支持：
+  - `assistant_text_delta`：按 `reply_to`（user message_id）找到对应 assistant 气泡并 append；不存在就新建。
+  - `assistant_message_final`：按 `reply_to` 将气泡文本替换为最终 text；不存在就新建。
+- 也已支持：`meta/ws_bound`、`ack`、`transcript_final`、`tool_call`、`agent_handoff`、`error` 等。
+
+### 后端落地方向（web/backend/app.py）
+- 需要把 `Runner.run(...)` 切到 Agents SDK 的 streaming API：
+  - 流式过程中对每个 `ResponseTextDeltaEvent` 发：`{type:"assistant_text_delta", reply_to, delta}`。
+  - 流结束后发：`{type:"assistant_message_final", message_id, reply_to, text}`（final text 以 SDK `final_output` 为准，避免与 delta 拼接不一致）。
+  - 同步 `agents_by_session[session_id] = result.last_agent`。
+- 同一套流程应用于：普通 `user_message` 以及 voice_input → transcript_final 之后的 agent 回复。
+
+### 注意事项 / 坑
+- 仍需 per-session lock，避免并发 run 导致 session 状态互相污染。
+- delta 必须带正确的 session 作用域（当前 EventBus 可按 `session_id` 过滤）。
+- 可选：WS 断开时 best-effort 取消流（非硬性）。
+- 验收点：长回复应能看到 token-by-token 增长；切 session 不串台；tool/handoff meta 仍可显示。
+
+## 2026.01.08（WebUI：Voice Mode 规划；STT 已落地，TTS 分段播放待实现）
+- 总目标：WebUI 增加语音输入 + 语音输出（分段 TTS 播放），并且与文本聊天共用同一 session/历史/UI 线程。
+- 里程碑：
+  - Phase 1：voice input + 基于最终回复文本的分段 TTS（非文本流）。
+  - Phase 2：assistant delta text → delta 驱动分段 TTS（唯一计划中的 Phase 2 增量）。
+
+### 已实现（STT）
+- 协议：Client `voice_input {session_id, message_id, audio_b64, mime}`；Server 回 `transcript_final {session_id, message_id, text}`，并继续走现有 `assistant_message` 文本输出。
+- 后端（web/backend/app.py）：
+  - `VOICE_INPUT_MAX_BYTES = 20MB`；base64 严格校验 + 大小限制。
+  - ffmpeg 转码为 `wav 16k mono pcm_s16le`（临时目录）。
+  - faster-whisper：`VOICE_STT_MODEL_SIZE = "medium"`，GPU `cuda/float16`；全局单例模型 + lock 防并发加载。
+  - 转码与转写都放到 `asyncio.to_thread(...)`，避免阻塞 event loop。
+  - transcript_final 回传后，用转写文本驱动 agent 执行并回 assistant_message。
+- 前端（web/frontend/src/App.svelte）：
+  - 输入框旁 Voice toggle：录音中显示 Stop。
+  - MediaRecorder 录音；停止后插入 placeholder 用户消息 `(transcribing...)`（id=message_id），发 voice_input。
+  - 收到 transcript_final 后按 message_id 精准替换 placeholder。
+  - 处理切 session race：用 `meta/ws_bound` + `wsSessionId`；未 bound 时把 payload 暂存到 `queuedVoicePayload`，bound 后再 flush。
+
+### 语音输出（TTS）
+- 分段规则：以 `。！？\n` 作为切分点，`min_chars_per_chunk = 16`；短句不足 16 则继续缓冲并与后续句子合并。
+- 反压策略：waterline（最多 5 个 frozen segment）+ `tail_buffer`。
+- 协议扩展：
+  - Client → Server：`voice_output_toggle {session_id, enabled}`。
+  - Server → Client：`tts_audio_segment {session_id, reply_to, seq, text, audio_b64, mime:"audio/mpeg"}`、`tts_done {session_id, reply_to}`。
+- 后端架构要点：每 session 一个 TTS worker；串行合成保证顺序；toggle off / disconnect 需要取消并清空队列，不做断线重放。
+- 使用 openai的 TTS API

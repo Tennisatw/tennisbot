@@ -1,21 +1,14 @@
+from dataclasses import dataclass
 import json
 
-
+@dataclass
 class Settings:
     """Global app settings loaded from data/setting.json."""
-
-    def __init__(
-        self,
-        *,
-        name: str,
-        lang: str,
-        default_max_turns: int,
-        default_ignore: list[str],
-    ):
-        self.name = name
-        self.lang = lang
-        self.default_max_turns = default_max_turns
-        self.default_ignore = default_ignore
+    name: str
+    lang: str
+    default_max_turns: int
+    default_ignore: list[str]
+    default_prompt: str
 
 
 def load_settings(path: str = "data/setting.json") -> Settings:
@@ -29,6 +22,7 @@ def load_settings(path: str = "data/setting.json") -> Settings:
         lang=data.get("lang", "zh-CN"),
         default_max_turns=data.get("default_max_turns", 20),
         default_ignore=data.get("default_ignore", []),
+        default_prompt=data.get("default_prompt", ""),
     )
 
 

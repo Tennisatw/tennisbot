@@ -12,6 +12,18 @@
 
 <br>
 
-检查whisper是否一致在调用。
+[error] runner_failed
+ModelBehaviorError('Model did not produce a final response!')
+是个bug，修修
 
 <br>
+
+保存sesion时也保存当前的model
+
+<br>
+
+输入框可以高一点
+
+<br>
+
+周期性任务
