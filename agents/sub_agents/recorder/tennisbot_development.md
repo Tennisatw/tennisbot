@@ -494,3 +494,7 @@ prompt: 依据时间顺序，记录 Tennisbot 的开发过程，包括时间线�
 - 现象：TTS 对复杂 Markdown 符号（如 `#`、`*`、反引号、链接语法等）处理不稳定，可能读出符号或卡顿。
 - 方案：在送入 TTS 前做一次 sanitize，把“非文字/数字/空白”的符号统一替换为空格，并压缩多余空白；注意 Python raw string 中 `\u4e00-\u9fff` 的写法要用单反斜杠，避免误伤中文。
 
+
+## 2026.01.10
+- 把 STT/TTS 相关逻辑从 `web/backend/app.py` 抽离到 `src/` 的对应模块（如 `src/stt.py`、`src/tts.py`），`app.py` 只保留路由/编排。
+

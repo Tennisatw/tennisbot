@@ -142,7 +142,7 @@ class Logger:
         if isinstance(sid, str) and sid and "session_id" not in payload:
             payload = {**payload, "session_id": sid}
 
-        pass
+        return
 
 
 logger = Logger()

@@ -7,9 +7,21 @@ from typing import Any
 import base64
 from dataclasses import dataclass, field
 import subprocess
-import tempfile
 
-from faster_whisper import WhisperModel
+# STT implementation lives in src/stt.py
+
+
+from src.stt import VOICE_DEBUG_DUMP_DIR, b64decode_audio, stt_transcribe_audio
+from src.tts import (
+    get_tts_state,
+    tts_enqueue_text,
+    tts_finalize_reply,
+    tts_maybe_start_worker,
+    tts_reset_session,
+    voice_output_enabled_by_session,
+)
+
+
 
 import dotenv
 from agents import Runner
@@ -253,199 +265,8 @@ def _get_run_lock(session_id: str) -> asyncio.Lock:
 run_locks_by_session: dict[str, asyncio.Lock] = {}
 agents_by_session: dict[str, Any] = {}
 
-# --- Voice output (TTS) session state (Phase 1/2)
-# Note: actual TTS synthesis is implemented in next step. For now we only
-# persist the toggle state and define outgoing event types.
-voice_output_enabled_by_session: dict[str, bool] = {}
-
-
-
-@dataclass
-class TtsSessionState:
-    enabled: bool = False
-    seq: int = 0
-    queue: asyncio.Queue[str] = field(default_factory=lambda: asyncio.Queue(maxsize=200))
-    tail_buffer: str = ""
-    cancel_gen: int = 0
-    worker_task: asyncio.Task | None = None
-    reply_to: str | None = None
-
-
-tts_state_by_session: dict[str, TtsSessionState] = {}
-
-
-def _get_tts_state(session_id: str) -> TtsSessionState:
-    st = tts_state_by_session.get(session_id)
-    if st is None:
-        st = TtsSessionState(enabled=bool(voice_output_enabled_by_session.get(session_id, False)))
-        tts_state_by_session[session_id] = st
-    return st
-
-
-def _tts_split_flushable_segments(*, buf: str, min_chars: int = 16) -> tuple[list[str], str]:
-    """Split buffer into flushable segments.
-
-    Delimiters: 。！？\n
-    Returns: (segments_to_flush, remaining_buf)
-
-    Rule:
-      - Emit a segment only when a delimiter is seen AND the candidate segment length >= min_chars.
-      - Otherwise keep buffering (short sentence merge).
-    """
-
-    delims = set(["。", "！", "？", "\n"])
-    out: list[str] = []
-    last_cut = 0
-
-    for i, ch in enumerate(buf):
-        if ch not in delims:
-            continue
-
-        cand = buf[last_cut : i + 1]
-        if len(cand.strip()) < min_chars:
-            continue
-
-        out.append(cand.strip())
-        last_cut = i + 1
-
-    rest = buf[last_cut:]
-    return out, rest
-
-
-def _tts_maybe_start_worker(*, session_id: str) -> None:
-    st = _get_tts_state(session_id)
-    if st.worker_task is not None and not st.worker_task.done():
-        return
-
-    async def _worker(gen: int) -> None:
-        while True:
-            seg = await st.queue.get()
-
-            # Debug: log the exact segment that will be synthesized by the TTS worker.
-            # Note: keep this before synth so failures still show what we tried to speak.
-            print("tts.worker_input seg=", (seg or "").replace("\n", "\\n"))
-
-            # canceled or disabled: drop.
-            if gen != st.cancel_gen or not st.enabled:
-                continue
-
-            st.seq += 1
-            seq = st.seq
-            reply_to = st.reply_to
-
-            # Prefer fake audio when configured (debug), otherwise call OpenAI TTS.
-            audio_b64 = ""
-
-            try:
-                if TTS_FAKE_AUDIO_PATH:
-                    global _tts_fake_audio_b64
-                    if _tts_fake_audio_b64 is None:
-                        with open(TTS_FAKE_AUDIO_PATH, "rb") as f:
-                            _tts_fake_audio_b64 = base64.b64encode(f.read()).decode("ascii")
-                    audio_b64 = _tts_fake_audio_b64 or ""
-                else:
-                    client = await _get_tts_client()
-                    mp3_bytes = await asyncio.to_thread(_tts_synthesize_mp3_bytes_sync, client=client, text=seg)
-                    if mp3_bytes:
-                        audio_b64 = base64.b64encode(mp3_bytes).decode("ascii")
-            except Exception as e:
-                logger.log(f"tts.synthesize_failed session_id={session_id} err={e!r}")
-                audio_b64 = ""
-            await _ws_publish(
-                session_id,
-                {
-                    "type": "tts_audio_segment",
-                    "reply_to": reply_to,
-                    "seq": seq,
-                    "text": seg,
-                    "audio_b64": audio_b64,
-                    "mime": "audio/mpeg",
-                },
-            )
-
-    st.worker_task = asyncio.create_task(_worker(st.cancel_gen))
-
-
-def _tts_reset_session(*, session_id: str) -> None:
-    st = _get_tts_state(session_id)
-    st.cancel_gen += 1
-    st.tail_buffer = ""
-    st.reply_to = None
-    # best-effort drain queue
-    try:
-        while not st.queue.empty():
-            st.queue.get_nowait()
-    except Exception:
-        pass
-
-
-async def _tts_enqueue_text(*, session_id: str, reply_to: str, text_delta: str) -> None:
-    """Delta-driven segmenter + enqueue with waterline/tail_buffer."""
-
-    # Debug: log the exact text fed into the TTS segmenter.
-    print("tts.input_delta ", (text_delta or "").replace("\n", "\\n"))
-
-    st = _get_tts_state(session_id)
-    if not st.enabled:
-        return
-
-    if st.reply_to != reply_to:
-        # New turn: reset seq/buffers for clarity.
-        st.seq = 0
-        st.tail_buffer = ""
-        st.reply_to = reply_to
-
-    buf = st.tail_buffer + text_delta
-    segs, rest = _tts_split_flushable_segments(buf=buf, min_chars=16)
-
-    # Waterline: allow at most 100 frozen segments in queue, which is really unreachable in practice.
-    for seg in segs:
-        if st.queue.qsize() >= 100:
-            return
-        await st.queue.put(seg)
-
-    st.tail_buffer = rest
-    _tts_maybe_start_worker(session_id=session_id)
-
-
-async def _tts_finalize_reply(*, session_id: str, reply_to: str) -> None:
-    st = _get_tts_state(session_id)
-    if not st.enabled:
-        return
-
-    # Flush tail_buffer even if short.
-    if st.reply_to == reply_to and st.tail_buffer.strip():
-        if st.queue.qsize() < 5:
-            await st.queue.put(st.tail_buffer.strip())
-        st.tail_buffer = ""
-
-    # Ensure the worker is running so the final tail segment is actually synthesized.
-    _tts_maybe_start_worker(session_id=session_id)
-
-    await _ws_publish(session_id, {"type": "tts_done", "reply_to": reply_to})
-
-
-
-app.add_middleware(
-    CORSMiddleware,
-        allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://10.0.0.31:5173",
-    ],
-
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/api/health")
-async def health() -> dict[str, str]:
-    """Health check endpoint."""
-
-    return {"status": "ok"}
-
+# --- Voice output (TTS)
+# Implementation moved to src/tts.py
 
 async def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
     """Publish a websocket event scoped to a session."""
@@ -454,266 +275,13 @@ async def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
     await event_bus.publish(payload)
 
 
-VOICE_INPUT_MAX_BYTES = 20 * 1024 * 1024
-VOICE_STT_MODEL_SIZE = "turbo"
-VOICE_DEBUG_DUMP_DIR = "data/voice_debug"
-
-# Voice output (TTS) debug: if set, server will send this mp3 payload for every tts_audio_segment.
-# Example: TTS_FAKE_AUDIO_PATH=data/temp/y2294.mp3
-_tts_fake_audio_b64: str | None = None
-# --- OpenAI TTS client (sync) ---
-_tts_client: OpenAI | None = None
-_tts_client_lock = asyncio.Lock()
-
-
-async def _get_tts_client() -> OpenAI:
-    """Get singleton OpenAI client for TTS.
-
-    Notes:
-        - Keep it separate from `agents.Runner`.
-        - Uses OPENAI_API_KEY from env.
-    """
-
-    global _tts_client
-    if _tts_client is not None:
-        return _tts_client
-
-    async with _tts_client_lock:
-        if _tts_client is not None:
-            return _tts_client
-        _tts_client = OpenAI()
-        return _tts_client
-    
-
-def tts_sanitize(t: str) -> str:
-    import re
-    # 把 markdown 常见结构先粗暴抹平
-    t = re.sub(r"```[\s\S]*?```", " ", t)   # 代码块整段去掉
-    t = re.sub(r"!\[[^\]]*\]\([^\)]*\)", " ", t)  # 图片
-
-    # 把所有“非文字/数字/空白”的符号都换成空格
-    t = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff\s]", " ", t)
-
-    # 压缩空白
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
-
-
-def _tts_synthesize_mp3_bytes_sync(*, client: OpenAI, text: str) -> bytes:
-    """Synthesize mp3 bytes for a segment.
-
-    Default:
-        - model: gpt-4o-mini-tts
-        - voice: alloy
-        - format: mp3
-
-    Runs in a worker thread.
-    """
-
-    # Defensive: avoid empty calls.
-    t = (text or "").strip()
-    if not t:
-        return b""
-
-    # New OpenAI Python SDK: audio.speech.create
-    audio = client.audio.speech.create(
-        model=os.getenv("TTS_MODEL", "gpt-4o-mini-tts"),
-        voice=os.getenv("TTS_VOICE", "marin"),
-        input=tts_sanitize(t),
-        response_format="mp3",
-        speed=1.15,
-    )
-
-    # `audio` can be a Response-like object; `read()` is supported in many SDK examples.
-    # Fall back to `.content` if present.
-    if hasattr(audio, "read"):
-        return audio.read()
-    if hasattr(audio, "content"):
-        return audio.content  # type: ignore
-    # Last resort: bytes(...) if it behaves like a buffer.
-    try:
-        return bytes(audio)  # type: ignore
-    except Exception:
-        return b""
-
-
-_stt_model: WhisperModel | None = None
-_stt_model_lock = asyncio.Lock()
-
-
-async def _get_stt_model() -> WhisperModel:
-    """Get singleton WhisperModel.
-
-    Notes:
-        - Model load is heavy; keep one instance per process.
-        - Use a lock to avoid concurrent loads.
-    """
-
-    global _stt_model
-    if _stt_model is not None:
-        return _stt_model
-
-    async with _stt_model_lock:
-        if _stt_model is not None:
-            return _stt_model
-
-        # device/compute_type are intentionally simple defaults.
-        # If you have NVIDIA GPU, faster-whisper will use CUDA when available.
-        _stt_model = WhisperModel(
-            VOICE_STT_MODEL_SIZE,
-            device="cuda",
-            compute_type="float16",
-        )
-        logger.log(f"stt.model_loaded size={VOICE_STT_MODEL_SIZE} device=cuda compute_type=float16")
-        return _stt_model
-
-
-def _transcode_to_wav_16k_mono(*, audio_bytes: bytes, mime: str) -> bytes:
-    """Transcode arbitrary audio bytes to wav(16kHz, mono, s16le) via ffmpeg.
-
-    Notes:
-        - Use temp files for simplicity.
-        - Requires `ffmpeg` in PATH.
-    """
-
-    # Best-effort extension hint for ffmpeg.
-    ext = "bin"
-    if "webm" in mime:
-        ext = "webm"
-    elif "ogg" in mime:
-        ext = "ogg"
-    elif "wav" in mime:
-        ext = "wav"
-    elif "mpeg" in mime or "mp3" in mime:
-        ext = "mp3"
-    elif "mp4" in mime:
-        ext = "mp4"
-
-    with tempfile.TemporaryDirectory() as td:
-        in_path = os.path.join(td, f"in.{ext}")
-        out_path = os.path.join(td, "out.wav")
-
-        with open(in_path, "wb") as f:
-            f.write(audio_bytes)
-
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            in_path,
-            "-ac",
-            "1",
-            "-ar",
-            "16000",
-            "-c:a",
-            "pcm_s16le",
-            out_path,
-        ]
-        subprocess.run(cmd, check=True)
-
-        with open(out_path, "rb") as f:
-            return f.read()
-
-
-def _stt_transcribe_sync(*, wav_bytes: bytes) -> str:
-    """Run STT sync in a worker thread."""
-
-    # faster-whisper can take a file path; keep it simple.
-    with tempfile.TemporaryDirectory() as td:
-        wav_path = os.path.join(td, "audio.wav")
-        with open(wav_path, "wb") as f:
-            f.write(wav_bytes)
-
-        # Lazy-load model in this thread via event loop helper.
-        # We can't await here; model is global and created once.
-        model = _stt_model
-        if model is None:
-            # Fallback: create model sync if called before async getter.
-            model = WhisperModel(
-                VOICE_STT_MODEL_SIZE,
-                device="cuda",
-                compute_type="float16",
-            )
-            globals()["_stt_model"] = model
-
-        segments, _info = model.transcribe(wav_path)
-        parts: list[str] = []
-        for s in segments:
-            t = (s.text or "").strip()
-            if t:
-                parts.append(t)
-        return " ".join(parts).strip()
-
-
-def _b64decode_audio(*, audio_b64: str) -> bytes:
-    """Decode base64 audio payload.
-
-    Notes:
-        - Expects raw base64 without data URL prefix.
-        - Enforces a hard size limit to avoid memory blowups.
-    """
-
-    if len(audio_b64) > (VOICE_INPUT_MAX_BYTES * 4 // 3) + 16:
-        raise ValueError("audio_too_large")
-
-    try:
-        data = base64.b64decode(audio_b64, validate=True)
-    except Exception as e:
-        raise ValueError("invalid_audio_b64") from e
-
-    if len(data) > VOICE_INPUT_MAX_BYTES:
-        raise ValueError("audio_too_large")
-
-    return data
+async def _tts_publish(session_id: str, payload: dict[str, Any]) -> None:
+    await _ws_publish(session_id, payload)
 
 
 
-async def _run_agent_for_user_text(*, session_id: str, message_id: str, user_text: str) -> str:
-    """Run agent for a user text and return assistant final text.
-
-    Notes:
-        - Serialized by per-session lock to avoid concurrent mutation.
-        - Persists last_agent back to agents_by_session.
-    """
-
-    async with _get_run_lock(session_id):
-        current_agent = agents_by_session.get(session_id)
-        if current_agent is None:
-            current_agent = _new_session_agent()
-            agents_by_session[session_id] = current_agent
-
-        t0 = time.time()
-        logger.log(
-            "ws.runner.start "
-            + f"id={message_id} agent={getattr(current_agent, 'name', None)} "
-            + f"model={getattr(current_agent, 'model', None)} key_set={bool(os.getenv('OPENAI_API_KEY'))}"
-        )
-
-        session = JsonlSession(session_id, path=str(SESSIONS_DIR / f"{session_id}.jsonl"))
-        result = await Runner.run(
-            current_agent,
-            user_text,
-            session=session,  # type: ignore
-            max_turns=settings.default_max_turns,
-        )
-        dt_ms = int((time.time() - t0) * 1000)
-        logger.log(f"ws.runner.done id={message_id} ms={dt_ms}")
-
-        last_agent = getattr(result, "last_agent", None)
-        if last_agent is not None:
-            agents_by_session[session_id] = last_agent
-
-        assistant_text = str(getattr(result, "final_output", ""))
-        logger.log(
-            "chat role=assistant name="
-            + getattr(agents_by_session[session_id], "name", "Agent")
-            + " output="
-            + assistant_text.replace("\\n", "\\\\n")
-        )
-        return assistant_text
+# STT moved to src/stt.py
+# (STT moved to src/stt.py)
 
 
 async def _run_agent_streaming_for_user_text(
@@ -781,9 +349,14 @@ async def _run_agent_streaming_for_user_text(
                 )
 
                 try:
-                    st = _get_tts_state(session_id)
+                    st = get_tts_state(session_id)
                     if st.enabled:
-                        await _tts_enqueue_text(session_id=session_id, reply_to=reply_to_message_id, text_delta=delta)
+                        await tts_enqueue_text(
+                            session_id=session_id,
+                            reply_to=reply_to_message_id,
+                            text_delta=delta,
+                            publish=_tts_publish,
+                        )
                 except Exception as e:
                     logger.log(f"tts.enqueue_failed session_id={session_id} err={e!r}")
 
@@ -797,8 +370,13 @@ async def _run_agent_streaming_for_user_text(
             agents_by_session[session_id] = last_agent
 
         final_text = str(getattr(result, "final_output", "") or "")
-        if not final_text:
+        # Some model/tool trajectories may yield an "empty" final output (only whitespace).
+        # Treat that as missing and fall back to streamed deltas.
+        if not final_text.strip():
             final_text = "".join(delta_parts)
+        # Hard fallback: never return empty text to the client.
+        if not final_text.strip():
+            final_text = "no output"
 
         assistant_message_id = str(uuid.uuid4())
         logger.log(
@@ -811,9 +389,9 @@ async def _run_agent_streaming_for_user_text(
 
         # Flush final tail buffer and notify client that TTS for this reply is done.
         try:
-            st = _get_tts_state(session_id)
+            st = get_tts_state(session_id)
             if st.enabled:
-                await _tts_finalize_reply(session_id=session_id, reply_to=reply_to_message_id)
+                await tts_finalize_reply(session_id=session_id, reply_to=reply_to_message_id, publish=_tts_publish)
         except Exception as e:
             logger.log(f"tts.finalize_failed session_id={session_id} err={e!r}")
         return assistant_message_id, final_text
@@ -886,13 +464,13 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
             voice_output_enabled_by_session[session_id] = enabled
 
-            st = _get_tts_state(session_id)
+            st = get_tts_state(session_id)
             st.enabled = enabled
 
             if not enabled:
-                _tts_reset_session(session_id=session_id)
+                tts_reset_session(session_id=session_id)
             else:
-                _tts_maybe_start_worker(session_id=session_id)
+                tts_maybe_start_worker(session_id=session_id, publish=_tts_publish)
 
             # Optional ack/meta so frontend can reflect server truth.
             await _ws_publish(session_id, {"type": "meta", "event": "voice_output", "enabled": enabled})
@@ -933,7 +511,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 continue
 
             try:
-                audio_bytes = _b64decode_audio(audio_b64=audio_b64)
+                audio_bytes = b64decode_audio(audio_b64=audio_b64)
             except ValueError as e:
                 await _ws_publish(session_id, {"type": "error", "message": str(e)})
                 continue
@@ -955,15 +533,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
             #     logger.log(f"ws.voice_input.dump_failed id={message_id} err={e!r}")
 
             try:
-                # Ensure model is loaded (async-safe) before running heavy work.
-                await _get_stt_model()
-
-                wav_bytes = await asyncio.to_thread(
-                    _transcode_to_wav_16k_mono,
-                    audio_bytes=audio_bytes,
-                    mime=mime,
-                )
-                transcript = await asyncio.to_thread(_stt_transcribe_sync, wav_bytes=wav_bytes)
+                transcript = await stt_transcribe_audio(audio_bytes=audio_bytes, mime=mime)
             except subprocess.CalledProcessError as e:
                 logger.log(f"ws.voice_input.ffmpeg_failed id={message_id} err={e!r}")
                 await _ws_publish(session_id, {"type": "error", "message": "ffmpeg_failed", "detail": repr(e)})
