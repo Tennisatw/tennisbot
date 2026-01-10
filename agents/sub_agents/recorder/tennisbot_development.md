@@ -476,3 +476,21 @@ prompt: 依据时间顺序，记录 Tennisbot 的开发过程，包括时间线�
 局域网访问 WebUI（10.0.0.31:5173）麦克风不可用，原因是浏览器对非安全上下文/不同 origin 的麦克风权限限制；127.0.0.1 会被特殊对待。
 用 mkcert 生成证书（web/frontend/10.0.0.31+2.pem 与 10.0.0.31+2-key.pem），并在 web/frontend/vite.config.ts 增加 `import fs from 'node:fs'`，配置 `server.https.key/cert` 读取 pem。
 重启 Vite 后改用 https://10.0.0.31:5173 访问，mic 正常。
+
+## 2026.01.10（WebUI：TTS 分段乱序/末句丢失修复；Markdown 符号清洗）
+- 用户反馈 TTS 两个问题：1) 最后一句偶发读不出来；2) 语音输出对应的文字片段顺序会颠倒（表现为句子被“搅拌”）。
+- 定位文件：`web/backend/app.py`。
+
+### 问题 1：最后一句读不出来（worker 未启动）
+- 现象：当整段回复都没有触发可 flush 的 segment 时（例如一直没遇到分隔符或句子太短），`_tts_finalize_reply()` 才第一次把 `tail_buffer` put 进队列；但此时 worker 可能尚未启动，导致队列无人消费 → 最后一句“读不出来”。
+- 修复：在 `_tts_finalize_reply()` flush `tail_buffer` 后，强制调用 `_tts_maybe_start_worker(session_id=session_id)`，确保最终 tail 段一定会被合成。
+
+### 问题 2：顺序颠倒（waterline 逻辑导致乱序）
+- 现象：`_tts_enqueue_text()` 中的 waterline（`qsize() >= 5`）分支会把 `rest` 先放进 `tail_buffer`，再把更早的 `seg` 追加进去，并 `return`；等价于把“后来的 rest”放到“更早的 seg”前面，天然制造乱序。
+- 用户建议：直接删掉 waterline，不限制队列长度（或至少不做回填），因为实际回复句子数量不大。
+- 处理：用户最终自行修改为“严格保序入队”：分句得到的 `segs` 按顺序逐个 `queue.put(seg)`；`tail_buffer` 只保存 `rest`；不再做 `qsize>=5` 的回填/早退逻辑。
+
+### 额外优化：TTS 输入清洗（Markdown/符号）
+- 现象：TTS 对复杂 Markdown 符号（如 `#`、`*`、反引号、链接语法等）处理不稳定，可能读出符号或卡顿。
+- 方案：在送入 TTS 前做一次 sanitize，把“非文字/数字/空白”的符号统一替换为空格，并压缩多余空白；注意 Python raw string 中 `\u4e00-\u9fff` 的写法要用单反斜杠，避免误伤中文。
+

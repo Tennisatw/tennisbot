@@ -38,10 +38,8 @@ draft_apply还有点小bug。盯着点。
 
 <br>
 
-[tts] done
-[tts] segment #3
-可以删除了
+段落最后一段语音好像读不出来，有时候反着读。修修。
 
 <br>
 
-段落最后一段语音好像读不出来
+handout还是有点问题，现在好像是默认交还给main

@@ -321,6 +321,10 @@ def _tts_maybe_start_worker(*, session_id: str) -> None:
         while True:
             seg = await st.queue.get()
 
+            # Debug: log the exact segment that will be synthesized by the TTS worker.
+            # Note: keep this before synth so failures still show what we tried to speak.
+            print("tts.worker_input seg=", (seg or "").replace("\n", "\\n"))
+
             # canceled or disabled: drop.
             if gen != st.cancel_gen or not st.enabled:
                 continue
@@ -378,6 +382,9 @@ def _tts_reset_session(*, session_id: str) -> None:
 async def _tts_enqueue_text(*, session_id: str, reply_to: str, text_delta: str) -> None:
     """Delta-driven segmenter + enqueue with waterline/tail_buffer."""
 
+    # Debug: log the exact text fed into the TTS segmenter.
+    print("tts.input_delta ", (text_delta or "").replace("\n", "\\n"))
+
     st = _get_tts_state(session_id)
     if not st.enabled:
         return
@@ -391,11 +398,9 @@ async def _tts_enqueue_text(*, session_id: str, reply_to: str, text_delta: str) 
     buf = st.tail_buffer + text_delta
     segs, rest = _tts_split_flushable_segments(buf=buf, min_chars=16)
 
-    # Waterline: allow at most 5 frozen segments in queue.
+    # Waterline: allow at most 100 frozen segments in queue, which is really unreachable in practice.
     for seg in segs:
-        if st.queue.qsize() >= 5:
-            st.tail_buffer = rest
-            st.tail_buffer += seg
+        if st.queue.qsize() >= 100:
             return
         await st.queue.put(seg)
 
@@ -413,6 +418,9 @@ async def _tts_finalize_reply(*, session_id: str, reply_to: str) -> None:
         if st.queue.qsize() < 5:
             await st.queue.put(st.tail_buffer.strip())
         st.tail_buffer = ""
+
+    # Ensure the worker is running so the final tail segment is actually synthesized.
+    _tts_maybe_start_worker(session_id=session_id)
 
     await _ws_publish(session_id, {"type": "tts_done", "reply_to": reply_to})
 
@@ -475,6 +483,20 @@ async def _get_tts_client() -> OpenAI:
             return _tts_client
         _tts_client = OpenAI()
         return _tts_client
+    
+
+def tts_sanitize(t: str) -> str:
+    import re
+    # 把 markdown 常见结构先粗暴抹平
+    t = re.sub(r"```[\s\S]*?```", " ", t)   # 代码块整段去掉
+    t = re.sub(r"!\[[^\]]*\]\([^\)]*\)", " ", t)  # 图片
+
+    # 把所有“非文字/数字/空白”的符号都换成空格
+    t = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff\s]", " ", t)
+
+    # 压缩空白
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
 
 
 def _tts_synthesize_mp3_bytes_sync(*, client: OpenAI, text: str) -> bytes:
@@ -497,7 +519,7 @@ def _tts_synthesize_mp3_bytes_sync(*, client: OpenAI, text: str) -> bytes:
     audio = client.audio.speech.create(
         model=os.getenv("TTS_MODEL", "gpt-4o-mini-tts"),
         voice=os.getenv("TTS_VOICE", "marin"),
-        input=t,
+        input=tts_sanitize(t),
         response_format="mp3",
         speed=1.15,
     )
@@ -758,7 +780,6 @@ async def _run_agent_streaming_for_user_text(
                     },
                 )
 
-                # Feed delta into TTS segmenter (Phase 2). Uses fake audio for now.
                 try:
                     st = _get_tts_state(session_id)
                     if st.enabled:

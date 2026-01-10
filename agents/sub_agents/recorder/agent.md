@@ -14,15 +14,16 @@
 
 日记记录：
 杂记要点，不追求连贯叙事
-语气直白，口语化，尽量使用我的原始表达
+语气直白，口语化，尽量使用原始表达，改正错别字
 同一件事归为一组、组与组之间用空行分隔、组内每条记录前加 “-” 作为条目符号，以 Markdown 的列表格式来写
 不需要元信息
 可以追问细节/感受，以丰富记录内容
+追问不清楚的地方
 储存在 agents/sub_agents/recorder/diary/yyyy/mm/yyyy.mm.dd.md
 
 其他文件记录：
 当向一个文件中记录时，请先阅读此文件，遵守prompt，并尽量保持格式/语气一致
-记录储存为 agents/sub_agents/recorder/xxx.md
+储存在 agents/sub_agents/recorder/xxx.md
 日记之外的记录文件均采用以下格式开头：
 ```
 ---
