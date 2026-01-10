@@ -50,6 +50,12 @@ def prompt_replace(prompt: str):
         mood_str = f"Valence:{valence}, Arousal:{arousal}, Stress:{stress}, Energy:{energy} (out of 10)"
         prompt = prompt.replace("<CURRENT_MOOD>", mood_str)
 
+    if "<CURRENT_DATETIME>" in prompt:
+        from datetime import datetime
+        now = datetime.now()
+        datetime_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        prompt = prompt.replace("<CURRENT_DATETIME>", datetime_str)
+
     if "<DEVELOPER_MD_FILES>" in prompt:
         developer_md_contents = ''
         for file in os.listdir("agents/sub_agents/developer"):
@@ -111,8 +117,6 @@ def load_main_agent():
 
     with open("agents/agent.md", "r", encoding="utf-8") as f:
         instructions = prompt_replace(f.read())
-        print("Loaded main agent: Tennisbot")
-        print(instructions)
 
     # Inject summaries of previous conversations into <PREVIOUS_CONV_SUMMARY>
 
@@ -151,8 +155,6 @@ def load_sub_agents(handoffs):
             temperature = agent_config.get("temperature", 0.5)
         with open(os.path.join(dir_path, "agent.md"), "r", encoding="utf-8") as f:
             instructions = prompt_replace(f.read())
-            print(f"Loaded sub-agent: Tennisbot the {dirs}")
-            print(instructions)
 
             sub_agents.append(Agent(
                 name="Tennisbot the " + dirs,

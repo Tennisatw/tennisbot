@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import fs from 'node:fs';
 
 export default defineConfig({
   plugins: [
@@ -9,7 +10,12 @@ export default defineConfig({
       },
     }),
   ],
-  server: {    proxy: {
+  server: {
+    https: {
+      key: fs.readFileSync('./10.0.0.31+2-key.pem'),
+      cert: fs.readFileSync('./10.0.0.31+2.pem'),
+    },
+    proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

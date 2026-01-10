@@ -447,7 +447,7 @@ async def _ws_publish(session_id: str, payload: dict[str, Any]) -> None:
 
 
 VOICE_INPUT_MAX_BYTES = 20 * 1024 * 1024
-VOICE_STT_MODEL_SIZE = "medium"
+VOICE_STT_MODEL_SIZE = "turbo"
 VOICE_DEBUG_DUMP_DIR = "data/voice_debug"
 
 # Voice output (TTS) debug: if set, server will send this mp3 payload for every tts_audio_segment.
@@ -499,7 +499,7 @@ def _tts_synthesize_mp3_bytes_sync(*, client: OpenAI, text: str) -> bytes:
         voice=os.getenv("TTS_VOICE", "marin"),
         input=t,
         response_format="mp3",
-        speed=1.1,
+        speed=1.15,
     )
 
     # `audio` can be a Response-like object; `read()` is supported in many SDK examples.

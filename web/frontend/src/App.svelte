@@ -349,9 +349,6 @@
           const audioB64 = typeof msg.audio_b64 === 'string' ? msg.audio_b64 : '';
           const mime = typeof msg.mime === 'string' ? msg.mime : 'audio/mpeg';
 
-          // Keep meta line for debugging.
-          messages = [...messages, { role: 'meta', text: `[tts] segment${seq !== null ? ` #${seq}` : ''}` }];
-
           if (!voiceOutputEnabled) return;
           if (!audioB64) return;
 
@@ -364,7 +361,6 @@
         }
 
         if (msg.type === 'tts_done') {
-          messages = [...messages, { role: 'meta', text: `[tts] done` }];
           playNextAudio();
           return;
         }
