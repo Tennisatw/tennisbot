@@ -9,5 +9,5 @@
         "openai:WebSearchTool"
     ],
     "temperature": 1,
-    "handoff_description": "For coordination of tasks that do not fall under your responsibilities, or to indicate that your tasks have been completed."
+    "handoff_description": "Handoff back to the main Tennisbot, for coordination of tasks that do not fall under your responsibilities. Ask user before handing back"
 }

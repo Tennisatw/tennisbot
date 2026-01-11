@@ -34,6 +34,10 @@ def logged_tool(fn):
     Logs:
         - tool.<name>.input: args/kwargs
         - tool.<name>.output: success/elapsed_ms + output preview or error
+
+    Notes:
+        - Swallow tool exceptions and return a structured failure dict.
+        - This prevents a single tool crash from taking down the whole Runner.
     """
 
     @wraps(fn)
@@ -53,12 +57,30 @@ def logged_tool(fn):
         try:
             output = await fn(*args, **kwargs)
         except Exception as e:
-            elapsed_ms = int((time.perf_counter() - t0) * 1000)
-            await logger.emit({"type": "tool_call", "name": name, "phase": "error"})
-            raise
+            logger.log(f"tool.{name}.error err={e!r}")
+            await logger.emit(
+                {
+                    "type": "tool_call",
+                    "name": name,
+                    "phase": "error",
+                    "error": repr(e),
+                }
+            )
+            await logger.emit(
+                {
+                    "type": "tool_error",
+                    "name": name,
+                    "error": str(e),
+                    "detail": repr(e),
+                }
+            )
+            return {
+                "success": False,
+                "error": str(e),
+                "detail": repr(e),
+            }
 
-        elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        msgs = [f"tool.{name}.output", f"elapsed_ms={elapsed_ms}", "output:"]
+        msgs = [f"tool.{name}.output", "output:"]
         if isinstance(output, dict):
             for k, v in output.items():
                 msgs.append(f"{k}={_normalize_value(v)}")
@@ -67,7 +89,14 @@ def logged_tool(fn):
         logger.log(" ".join(msgs))
 
         success = bool(output["success"]) if isinstance(output, dict) else False
-        await logger.emit({"type": "tool_call", "name": name, "phase": "end", "success": success})
+        await logger.emit(
+            {
+                "type": "tool_call",
+                "name": name,
+                "phase": "end",
+                "success": success,
+            }
+        )
         return output
 
     return wrapper

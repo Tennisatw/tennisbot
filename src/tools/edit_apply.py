@@ -29,12 +29,21 @@ class _EditResult:
     error: str | None
     preview_before: str
     preview_after: str
+    context_before: str
+    context_after: str
 
 def _clip(s: str, *, max_len: int = 240) -> str:
     """Clip a string for previews."""
     if len(s) <= max_len:
         return s
     return s[:max_len] + "..."
+
+
+def _context(text: str, idx: int, *, before: int = 240, after: int = 240) -> str:
+    """Return a small context window around idx."""
+    start = max(0, idx - before)
+    end = min(len(text), idx + after)
+    return _clip(text[start:end], max_len=before + after)
 
 
 def _count_occurrences(haystack: str, needle: str) -> int:
@@ -60,6 +69,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error="Missing required field: file",
             preview_before="",
             preview_after="",
+            context_before="",
+            context_after="",
         )
 
     if op not in {"replace", "insert_before", "insert_after"}:
@@ -72,6 +83,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error=f"Unsupported op: {op}",
             preview_before="",
             preview_after="",
+            context_before="",
+            context_after="",
         )
 
     if anchor == "":
@@ -84,6 +97,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error="Missing required field: anchor",
             preview_before="",
             preview_after="",
+            context_before="",
+            context_after="",
         )
 
     hits = _count_occurrences(text, anchor)
@@ -97,6 +112,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error="Anchor not found",
             preview_before="",
             preview_after="",
+            context_before="",
+            context_after="",
         )
 
     # Guardrail: anchor must be unique.
@@ -111,6 +128,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error=f"Anchor not unique (hits={hits})",
             preview_before="",
             preview_after="",
+            context_before="",
+            context_after="",
         )
 
 
@@ -125,6 +144,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error="Failed to locate anchor",
             preview_before="",
             preview_after="",
+            context_before="",
+            context_after="",
         )
 
     if op == "insert_before":
@@ -138,6 +159,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error=None,
             preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
             preview_after=_clip(new_text[anchor_idx : anchor_idx + len(content) + len(anchor)]),
+            context_before=_context(text, anchor_idx),
+            context_after=_context(new_text, anchor_idx),
         )
 
     if op == "insert_after":
@@ -152,6 +175,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error=None,
             preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
             preview_after=_clip(new_text[anchor_idx : anchor_idx + len(anchor) + len(content)]),
+            context_before=_context(text, insert_at),
+            context_after=_context(new_text, insert_at),
         )
 
     # replace
@@ -165,6 +190,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error="Missing required field for replace: match",
             preview_before="",
             preview_after="",
+            context_before="",
+            context_after="",
         )
 
     window = text[anchor_idx : anchor_idx + 8192]
@@ -183,6 +210,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
                 error=f"Invalid regex: {e}",
                 preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
                 preview_after="",
+                context_before=_context(text, anchor_idx),
+                context_after="",
             )
 
         if m is None:
@@ -195,6 +224,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
                 error="Match not found after anchor (regex)",
                 preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
                 preview_after="",
+                context_before=_context(text, anchor_idx),
+                context_after="",
             )
 
         a, b = m.span()
@@ -214,6 +245,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error=None,
             preview_before=_clip(window[a:b]),
             preview_after=_clip(content),
+            context_before=_context(text, anchor_idx + a),
+            context_after=_context(new_text, anchor_idx + a),
         )
 
     # Literal match
@@ -228,6 +261,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
             error="Match not found after anchor (match is a literal substring; use re:... for regex)",
             preview_before=_clip(text[anchor_idx : anchor_idx + len(anchor)]),
             preview_after="",
+            context_before=_context(text, anchor_idx),
+            context_after="",
         )
 
     match_idx = anchor_idx + rel
@@ -241,6 +276,8 @@ def _apply_one(text: str, inst: Instruction) -> tuple[str, _EditResult]:
         error=None,
         preview_before=_clip(text[match_idx : match_idx + len(match)]),
         preview_after=_clip(content),
+        context_before=_context(text, match_idx),
+        context_after=_context(new_text, match_idx),
     )
 
 @function_tool
@@ -354,7 +391,12 @@ async def edit_apply(
                         "anchor_hits": r.anchor_hits,
                         "changed": False,
                         "error": f"Failed to write file: {repr(e)}",
-                        "preview": {"before": r.preview_before, "after": r.preview_after},
+                        "preview": {
+                            "before": r.preview_before,
+                            "after": r.preview_after,
+                            "context_before": r.context_before,
+                            "context_after": r.context_after,
+                        },
                     }
                 )
                 any_fail = True
@@ -368,7 +410,12 @@ async def edit_apply(
                 "anchor_hits": r.anchor_hits,
                 "changed": r.changed,
                 "error": r.error,
-                "preview": {"before": r.preview_before, "after": r.preview_after},
+                "preview": {
+                    "before": r.preview_before,
+                    "after": r.preview_after,
+                    "context_before": r.context_before,
+                    "context_after": r.context_after,
+                },
             }
         )
 

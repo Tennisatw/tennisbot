@@ -12,12 +12,6 @@
 
 <br>
 
-[error] runner_failed
-ModelBehaviorError('Model did not produce a final response!')
-是个bug，修修
-
-<br>
-
 保存sesion时也保存当前的model
 
 <br>
@@ -30,15 +24,7 @@ ModelBehaviorError('Model did not produce a final response!')
 
 <br>
 
-draft_apply还有点小bug。盯着点。
-
-<br>
-
 提示词改成纯英文，也许会好点
-
-<br>
-
-段落最后一段语音好像读不出来，有时候反着读。修修。
 
 <br>
 

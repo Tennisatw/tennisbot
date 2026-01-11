@@ -4,14 +4,9 @@ import os
 import time
 import uuid
 from typing import Any
-import base64
-from dataclasses import dataclass, field
 import subprocess
 
-# STT implementation lives in src/stt.py
-
-
-from src.stt import VOICE_DEBUG_DUMP_DIR, b64decode_audio, stt_transcribe_audio
+from src.stt import b64decode_audio, stt_transcribe_audio
 from src.tts import (
     get_tts_state,
     tts_enqueue_text,
@@ -21,19 +16,12 @@ from src.tts import (
     voice_output_enabled_by_session,
 )
 
-
-
 import dotenv
 from agents import Runner
 from openai.types.responses import ResponseTextDeltaEvent
-# OpenAI TTS (for real voice output)
-from openai import OpenAI
-
-
 
 from src.jsonl_session import JsonlSession
 from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
 
 from src.load_agent import create_handoff_obj, load_main_agent, load_sub_agents
 from src.session_history import get_recent_messages, push_session_history
@@ -44,7 +32,6 @@ from src.session_archive import archive_session_store
 
 # Voice output (TTS) debug: if set, server will send this mp3 payload for every tts_audio_segment.
 # Prefer setting env var `TTS_FAKE_AUDIO_PATH` instead of hardcoding.
-TTS_FAKE_AUDIO_PATH = ""
 dotenv.load_dotenv()
 
 logger.setup()
@@ -82,7 +69,6 @@ async def log_http_requests(request, call_next):
     return response
 
 
-
 class EventBus:
     """Async event bus for pushing server-side events to WebSocket clients."""
 
@@ -93,7 +79,17 @@ class EventBus:
         self._lock = asyncio.Lock()
 
     async def publish(self, payload: dict[str, Any]) -> None:
-        await self._queue.put(payload)
+        """Publish an event.
+
+        Notes:
+            - Never block producers.
+            - If the queue is full, drop the newest payload.
+        """
+
+        try:
+            self._queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            logger.log("event_bus.drop queue_full")
 
     async def add(self, ws: WebSocket, *, session_id: str | None) -> None:
         async with self._lock:
@@ -279,11 +275,6 @@ async def _tts_publish(session_id: str, payload: dict[str, Any]) -> None:
     await _ws_publish(session_id, payload)
 
 
-
-# STT moved to src/stt.py
-# (STT moved to src/stt.py)
-
-
 async def _run_agent_streaming_for_user_text(
     *,
     session_id: str,
@@ -365,9 +356,10 @@ async def _run_agent_streaming_for_user_text(
         dt_ms = int((time.time() - t0) * 1000)
         logger.log(f"ws.runner.stream.done id={message_id} ms={dt_ms}")
 
-        last_agent = getattr(result, "last_agent", None)
+        last_agent = getattr(streamed, "current_agent", None)
         if last_agent is not None:
             agents_by_session[session_id] = last_agent
+        print([agent.name for agent in agents_by_session.values()])
 
         final_text = str(getattr(result, "final_output", "") or "")
         # Some model/tool trajectories may yield an "empty" final output (only whitespace).
