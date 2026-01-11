@@ -31,14 +31,28 @@ prompt: 向此文件记录时的要求/注意事项
 
 根目录：<ROOT_PATH>
 
+入口与脚本：
+    CLI 入口：cli_main.py
+    启动 CLI：start_cli.bat
+    启动 WebUI：start_webui.bat
+
 核心代码（src/）：
     agent加载：src/load_agent.py
-    logger相关：src/logger.py
-    CLI 运行会话相关：src/cli_run_session.py
-    WebUI session/index：src/sessions_index.py
-    WebUI history/messages：src/session_history.py
+    settings：src/settings.py
+    logger：src/logger.py
 
-    agent工具实现：src/tools/<toolname>.py
+    CLI 会话运行：src/cli_run_session.py
+
+    会话存储（jsonl）：src/jsonl_session.py
+    WebUI sessions index：src/sessions_index.py
+    WebUI history/messages：src/session_history.py
+    会话归档：src/session_archive.py
+
+    语音：
+        STT：src/stt.py
+        TTS：src/tts.py
+
+    内置工具实现：src/tools/<toolname>.py
 
 Agent 相关（agents/）：
     主agent配置：agents/agent.json
@@ -55,22 +69,16 @@ Agent 相关（agents/）：
     会话文件总结：data/session_summaries/<session_id>.md
 
 WebUI 相关（web/）：
+    后端：web/backend/
+        FastAPI 入口及核心逻辑：web/backend/app.py
     前端：web/frontend/
         入口：web/frontend/src/main.ts
         UI及逻辑：web/frontend/src/App.svelte
-    后端：web/backend/
-        核心逻辑：web/backend/app.py (FastAPI 路由/WS)
-    启动脚本：start_webui.bat
-
-CLI 运行模式：
-    入口：cli_main.py
-    运行会话：cli_run_session.py
-    启动脚本：start_cli.bat
 
 程序运行记录：logs/yyyy-mm-dd.log
 
 测试文件：
-tests/
+    tests/
 
 附：本项目的环境与框架：
 运行环境：uv（Python 3.13.x）

@@ -707,7 +707,7 @@
       <footer class="flex gap-2 px-4 py-3 border-t border-gray-200 bg-white sticky bottom-0">
         <textarea
           class="flex-1 px-3 py-2 text-base rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-gray-900/20 resize-none"
-          rows={3}
+          rows={Math.min(10, Math.max(3, text.split('\n').length))}
           placeholder="Type a message..."
           bind:value={text}
           on:keydown={(e) => {
