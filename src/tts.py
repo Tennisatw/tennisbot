@@ -213,7 +213,7 @@ async def tts_finalize_reply(*, session_id: str, reply_to: str, publish: Publish
 
     # Flush tail_buffer even if short.
     if st.reply_to == reply_to and st.tail_buffer.strip():
-        if st.queue.qsize() < 5:
+        if st.queue.qsize() < 100:
             await st.queue.put(st.tail_buffer.strip())
         st.tail_buffer = ""
 

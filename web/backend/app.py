@@ -359,7 +359,6 @@ async def _run_agent_streaming_for_user_text(
         last_agent = getattr(streamed, "current_agent", None)
         if last_agent is not None:
             agents_by_session[session_id] = last_agent
-        print([agent.name for agent in agents_by_session.values()])
 
         final_text = str(getattr(result, "final_output", "") or "")
         # Some model/tool trajectories may yield an "empty" final output (only whitespace).
@@ -368,7 +367,7 @@ async def _run_agent_streaming_for_user_text(
             final_text = "".join(delta_parts)
         # Hard fallback: never return empty text to the client.
         if not final_text.strip():
-            final_text = "no output"
+            final_text = "---"
 
         assistant_message_id = str(uuid.uuid4())
         logger.log(
